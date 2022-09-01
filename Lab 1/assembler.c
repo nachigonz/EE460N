@@ -225,10 +225,6 @@ int offsetGet(char * arg){
         }
     else {
         address = pc + 2 + (toNum(arg) << 1);
-//        if (address > pc)
-//            address += 1;
-//        else
-//            address += -3;
     }
     offset = (address - (pc + 2)) >> 1;
 
@@ -259,7 +255,7 @@ int createCode(char * label, char
         int dr = regToNum(arg1)<<9;
         int sr1 = regToNum(arg2)<<6;
         int sr2;
-        if(*arg3 == 'R')
+        if(*arg3 == 'r')
             sr2 = regToNum(arg3);
         else {
             sr2 = (0b100000) + (toNum(arg3) & 0b11111); // Masking leading 1s from possible neg numbers
@@ -454,6 +450,7 @@ int main(int argc, char* argv[]) {
     rewind(infile);
     secondPass();
 
+    fclose(infile);
     fclose(outfile);
 
     return 0;
