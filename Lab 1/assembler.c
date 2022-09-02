@@ -113,6 +113,7 @@ int isOpcode (char * opcode) {
     for (int i = 0; i < 28; i++)
         if (strcmp(opcodes[i], opcode) == 0)
             return i;
+    //printf("%s is not an opcode\n", opcode);
     return -1;
 }
 
@@ -224,10 +225,11 @@ int offsetGet(char * arg){
                 address=symbolTable[i].address;
         }
     else {
-        address = pc + 2 + (toNum(arg) << 1);
+        address = pc + (toNum(arg) << 1);
     }
-    offset = (address - (pc + 2)) >> 1;
+    offset = (address - (pc)) >> 1;
 
+    //printf("%X %X %X\n", address, pc, offset);
     return offset + 1;
 }
 
@@ -390,20 +392,20 @@ void secondPass(){
         if( lRet != DONE && lRet != EMPTY_LINE )
         {
             //printf("%s ! %s : %s %s %s %s\n", lLabel, lOpcode, lArg1, lArg2, lArg3, lArg4);
+            //printf("%s\n", lOpcode);
 
+            pc+=2;
             if (strcmp(lOpcode, ".end") == 0){
                 lRet = DONE;
             }
             else if (strcmp(lOpcode, ".orig")==0)
-                fprintf(outfile, "0x%04X\n", toNum(lArg1));
+                fprintf(outfile, "0x%04X\n", toNum(lArg1) & 0xFFFF);
             else if (strcmp(lOpcode, ".fill")==0)
-                fprintf(outfile, "0x%04X\n", toNum(lArg1));
+                fprintf(outfile, "0x%04X\n", toNum(lArg1) & 0xFFFF);
             else {
                 int machineCode = createCode(lLabel, lOpcode, lArg1, lArg2, lArg3, lArg4);
-                fprintf(outfile, "0x%04X\n", machineCode);
+                fprintf(outfile, "0x%04X\n", machineCode & 0xFFFF);
             }
-
-            pc += 2;
         }
     } while( lRet != DONE );
 }

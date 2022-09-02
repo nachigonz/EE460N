@@ -1,3 +1,5 @@
 CMakeLists.txt
 .idea/
 cmake-build-debug/
+Lab 1/test.asm
+Lab 1/test.obj
