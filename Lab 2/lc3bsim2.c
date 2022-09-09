@@ -481,7 +481,7 @@ void process_instruction(){
     *       -Update NEXT_LATCHES
     */  
   
-  int instruction = getWord(CURRENT_LATCHES.PC);
+  int instruction = getWord(NEXT_LATCHES.PC);
   //printf("Instruction %X: 0x%04X\n", CURRENT_LATCHES.PC, instruction);
   NEXT_LATCHES.PC += 2;
 
@@ -525,14 +525,76 @@ void process_instruction(){
       setCC(DR);
       break;
     }
-    case 3:{ // STB
+    case 3:{ // STB *
       int tarA = add16(NEXT_LATCHES.REGS[getReg(instruction, 6)], sext(instruction & 0x3F, 6, 16));
       //printf("tarA: %04X\n", tarA);
       writeByte(tarA, NEXT_LATCHES.REGS[getReg(instruction, 9)]);
       break;
     }
-    case 4:{ // JSR
-
+    case 4:{ // JSR *
+      int sBit = getBit(instruction, 11);
+      NEXT_LATCHES.REGS[7] = NEXT_LATCHES.PC;
+      if (sBit == 0){
+        NEXT_LATCHES.PC = NEXT_LATCHES.REGS[getReg(instruction, 6)];
+      }
+      else{
+        NEXT_LATCHES.PC = add16(NEXT_LATCHES.PC, sext(instruction & 0x07FF, 11, 16) << 1);
+      }
+      //printf("Next PC: %04X, Offset: %04X\n", NEXT_LATCHES.PC, sext(instruction & 0x1FF, 11, 32) << 1);
+      break;
+    }
+    case 5:{ // AND *
+      int sBit = getBit(instruction, 5);
+      int DR = getReg(instruction, 9);
+      if (sBit == 0){
+        NEXT_LATCHES.REGS[DR] = NEXT_LATCHES.REGS[getReg(instruction, 6)] & NEXT_LATCHES.REGS[getReg(instruction, 0)];
+      }
+      else {
+        NEXT_LATCHES.REGS[DR] = NEXT_LATCHES.REGS[getReg(instruction, 6)] & sext(instruction & 0x1F, 5, 16);
+      }
+      setCC(DR);
+      break;
+    }
+    case 6:{ // LDW *
+      int DR = getReg(instruction, 9);
+      NEXT_LATCHES.REGS[DR] = getWord(add16(NEXT_LATCHES.REGS[getReg(instruction, 6)], sext(instruction & 0x3F, 6, 16) << 1));
+      setCC(DR);
+      break;
+    }
+    case 7:{ // STW *
+      int tarA = add16(NEXT_LATCHES.REGS[getReg(instruction, 6)], sext(instruction & 0x3F, 6, 16) << 1);
+      //printf("tarA: %04X\n", tarA);
+      writeWord(tarA, NEXT_LATCHES.REGS[getReg(instruction, 9)]);
+      break;
+    }
+    case 8:{ // RTI not implemented
+      break;
+    }
+    case 9:{ // XOR *
+      int DR = getReg(instruction, 9);
+      int sBit = getBit(instruction, 5);
+      if (sBit == 0){
+        NEXT_LATCHES.REGS[DR] = NEXT_LATCHES.REGS[getReg(instruction, 6)] ^ NEXT_LATCHES.REGS[getReg(instruction, 0)];
+      }
+      else{
+        NEXT_LATCHES.REGS[DR] = NEXT_LATCHES.REGS[getReg(instruction, 6)] ^ sext(instruction & 0x1F, 5, 16);
+      }
+      setCC(DR);
+      break;
+    }
+    case 10:{ // Not used
+      break;
+    }
+    case 11:{ // Not used
+      break;
+    }
+    case 12:{ // JMP *
+      int BR = getReg(instruction, 6);
+      NEXT_LATCHES.PC = NEXT_LATCHES.REGS[BR];
+      break;
+    }
+    case 13:{
+      break;
     }
     default:
       break;
