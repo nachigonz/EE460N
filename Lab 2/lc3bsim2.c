@@ -400,16 +400,142 @@ int main(int argc, char *argv[]) {
 
 /***************************************************************/
 
+int pows(int num, int a){
+  //printf("Pows: %d, %d\n", num, a);
+  int res = 1;
+  for (int i = 0; i < a; i++){
+    res *= num;
+  }
+  return res;
+}
 
+int getBit(int num, int i){
+  //printf("Num: %08X, %04X\n", num, pows(2, i));
+  return (num & pows(2, i)) >> i;
+}
+
+int sext(int num, int orig, int new){
+  int sBit = getBit(num, orig-1);
+  //printf("sBit: %d\n", sBit);
+  if (sBit){ // true if negative num
+    return (num | ((pows(2, new-orig) -1) << (orig))) & (pows(2, new) - 1);
+  }
+  else
+    return num & (pows(2, new)-1); // Don't need to extend positive nums
+}
+
+int getReg(int num, int i){ // i is the lowest bit of the reg
+  return ((num & pows(2, i+2)) + (num & pows(2, i+1)) + (num & pows(2, i))) >> i;
+}
+
+int add16(int num1, int num2){
+  //printf("Add16: %08X %08X\n", sext(num1, 16, 32), sext(num2, 16, 32));
+  return (sext(num1, 16, 32) + sext(num2, 16, 32)) & 0xFFFF;
+}
+
+void setCC(int reg){
+  int val = sext(NEXT_LATCHES.REGS[reg], 16, 32);
+  //printf("CC Check: %04X\n", val);
+  NEXT_LATCHES.N = 0;
+  NEXT_LATCHES.Z = 0;
+  NEXT_LATCHES.P = 0;
+  if (val == 0){
+    NEXT_LATCHES.Z = 1;
+  }
+  else if (val < 0){
+    NEXT_LATCHES.N = 1;
+  }
+  else {
+    NEXT_LATCHES.P = 1;
+  }
+}
+
+int getWord(int Address) { // Pass the address in lc3b
+  // printf("Halves: %02X %02X\n", MEMORY[Address][1], MEMORY[Address][0]);
+  return MEMORY[Address >> 1][0] + (MEMORY[Address >> 1][1] << 8);
+  // MEMORY only holds bytes so we don't need to mask
+}
+
+int getByte(int Address) { // Pass the address in lc3b
+  // printf("Byte: %02X\n", MEMORY[Address >> 1][Address % 1]);
+  return MEMORY[Address >> 1][Address % 2];
+  // MEMORY only holds bytes so we don't need to mask
+}
+
+void writeWord(int Address, int word){
+  MEMORY[Address >> 1][0] = word & 0xFF;
+  MEMORY[Address >> 1][1] = (word & 0xFF00) >> 8;
+}
+
+void writeByte(int Address, int word){
+  MEMORY[Address >> 1][Address % 2] = word & 0xFF;
+}
 
 void process_instruction(){
   /*  function: process_instruction
-   *  
-   *    Process one instruction at a time  
-   *       -Fetch one instruction
-   *       -Decode 
-   *       -Execute
-   *       -Update NEXT_LATCHES
-   */     
+    *  
+    *    Process one instruction at a time  
+    *       -Fetch one instruction
+    *       -Decode 
+    *       -Execute
+    *       -Update NEXT_LATCHES
+    */  
+  
+  int instruction = getWord(CURRENT_LATCHES.PC);
+  //printf("Instruction %X: 0x%04X\n", CURRENT_LATCHES.PC, instruction);
+  NEXT_LATCHES.PC += 2;
+
+  int opcode = (instruction & 0xF000) >> 12;
+  //printf("Opcode: %X\n", opcode);
+
+  switch (opcode){
+
+    case 0:{ // BR *
+      int n = getBit(instruction, 11);
+      int z = getBit(instruction, 10);
+      int p = getBit(instruction, 9);
+      // printf("Curr PC: %04X\n", NEXT_LATCHES.PC + 0xFFFFFFFE);
+      if ((n && NEXT_LATCHES.N) || (z && NEXT_LATCHES.Z) || (p && NEXT_LATCHES.P))
+        NEXT_LATCHES.PC = add16(NEXT_LATCHES.PC, sext(instruction & 0x1FF, 9, 16) << 1); // PC is already incremented
+      //printf("NZP: %X %X %X\n", n, z, p);
+      //printf("Curr NZP: %X %X %X\n", NEXT_LATCHES.N, NEXT_LATCHES.Z, NEXT_LATCHES.P);
+      //printf("Next PC: %04X, Offset: %04X\n", NEXT_LATCHES.PC, sext(instruction & 0x1FF, 9, 32) << 1);
+      break;
+    }
+    case 1:{ // ADD *
+      int DR = getReg(instruction, 9);
+      //printf("DR: %d, Bit: %d\n", DR, getBit(instruction, 5));
+      if(getBit(instruction, 5) == 0){
+        //printf("SR: %d, SR2: %d\n", getReg(instruction, 6) + getReg(instruction, 0));
+        NEXT_LATCHES.REGS[DR] = add16(NEXT_LATCHES.REGS[getReg(instruction, 6)], NEXT_LATCHES.REGS[getReg(instruction, 0)]);
+      }
+      else{
+        NEXT_LATCHES.REGS[DR] = add16(NEXT_LATCHES.REGS[getReg(instruction, 6)], sext(instruction & 0x1F, 5, 32));
+      }
+      setCC(DR);
+      break;
+    }
+    case 2:{ // LDB *
+      int DR = getReg(instruction, 9);
+      // printf("DR: %d\n", DR);
+      // printf("TarA: %04X\n", add16(NEXT_LATCHES.REGS[getReg(instruction, 6)], sext(instruction & 0x3F, 6, 16)));
+      int tar = getByte(add16(NEXT_LATCHES.REGS[getReg(instruction, 6)], sext(instruction & 0x3F, 6, 16)));
+      // printf("Tar: %04X\n", tar);
+      NEXT_LATCHES.REGS[DR] = sext(tar, 8, 16);
+      setCC(DR);
+      break;
+    }
+    case 3:{ // STB
+      int tarA = add16(NEXT_LATCHES.REGS[getReg(instruction, 6)], sext(instruction & 0x3F, 6, 16));
+      //printf("tarA: %04X\n", tarA);
+      writeByte(tarA, NEXT_LATCHES.REGS[getReg(instruction, 9)]);
+      break;
+    }
+    case 4:{ // JSR
+
+    }
+    default:
+      break;
+  }
 
 }
