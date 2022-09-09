@@ -471,6 +471,15 @@ void writeByte(int Address, int word){
   MEMORY[Address >> 1][Address % 2] = word & 0xFF;
 }
 
+int rshfa(int word, int a){
+  int sBit = getBit(word, 15); // get sign bit
+  //printf("sBit: %d, a: %d\n", sBit, a);
+  if (sBit == 0)
+    return word >> a;  
+  //printf("word >> a: %04X, or: %04X\n", word >> a, (pows(2, a) - 1) << (16 - a));
+  return (word >> a) | ((pows(2, a) - 1) << (16 - a));
+}
+
 void process_instruction(){
   /*  function: process_instruction
     *  
@@ -533,13 +542,14 @@ void process_instruction(){
     }
     case 4:{ // JSR *
       int sBit = getBit(instruction, 11);
-      NEXT_LATCHES.REGS[7] = NEXT_LATCHES.PC;
+      int temp = NEXT_LATCHES.PC;
       if (sBit == 0){
         NEXT_LATCHES.PC = NEXT_LATCHES.REGS[getReg(instruction, 6)];
       }
       else{
         NEXT_LATCHES.PC = add16(NEXT_LATCHES.PC, sext(instruction & 0x07FF, 11, 16) << 1);
       }
+      NEXT_LATCHES.REGS[7] = temp;
       //printf("Next PC: %04X, Offset: %04X\n", NEXT_LATCHES.PC, sext(instruction & 0x1FF, 11, 32) << 1);
       break;
     }
@@ -593,7 +603,33 @@ void process_instruction(){
       NEXT_LATCHES.PC = NEXT_LATCHES.REGS[BR];
       break;
     }
-    case 13:{
+    case 13:{ // SHF *
+      int DR = getReg(instruction, 9);
+      int sBit5 = getBit(instruction, 5);
+      int sBit4 = getBit(instruction, 4);
+      if (sBit4 == 0){
+        NEXT_LATCHES.REGS[DR] = (NEXT_LATCHES.REGS[getReg(instruction, 6)] << (instruction & 0xF)) & 0xFFFF;
+      }
+      else {
+        if (sBit5 == 0){
+          NEXT_LATCHES.REGS[DR] = (NEXT_LATCHES.REGS[getReg(instruction, 6)] >> (instruction & 0xF)) & 0xFFFF;
+        }
+        else{
+          NEXT_LATCHES.REGS[DR] = rshfa(NEXT_LATCHES.REGS[getReg(instruction, 6)], instruction & 0xF) & 0xFFFF;
+        }
+      }
+      setCC(DR);
+      break;
+    }
+    case 14:{ // LEA *
+      int DR = getReg(instruction, 9);
+      NEXT_LATCHES.REGS[DR] = add16(NEXT_LATCHES.PC, sext(instruction & 0x01FF, 9, 16) << 1);
+      break;
+    }
+    case 15:{ // TRAP *
+      NEXT_LATCHES.REGS[7] = NEXT_LATCHES.PC;
+      NEXT_LATCHES.PC = getWord((instruction & 0x00FF) << 1);
+      //printf("TRAP Address: %04X\n", (instruction & 0x00FF) << 1);
       break;
     }
     default:
