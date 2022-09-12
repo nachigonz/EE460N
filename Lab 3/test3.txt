@@ -1,0 +1,37 @@
+.ORIG x3000 ; File to test each opcode
+START ADD R0, R1, R7 ;
+ADD R5, R7, x4 ;
+AND R0, R0, R7 ;
+AND R0, R7, #1 ;
+BRn START ;
+BRp START ;
+BRz START ;
+BR START ;
+BRnz NEXT ;
+BRnp NEXT ;
+BRzp NEXT ;
+BRnzp NEXT ;
+NEXT HALT ;
+JMP R7 ;
+JSR NEXT ;
+JSRR R6 ;
+LDB R0, R7, #2 ;
+LDW R0, R7, #3 ;
+LEA R0, START ;
+NOT R0, R7 ;
+RET ;
+RTI ;
+LSHF R0, R7, #1 ;
+RSHFL R0, R7, #2 ;
+RSHFA R0, R7, #3 ;
+STB R0, R7, x1 ;
+STW R0, R7, #1 ;
+TRAP x22 ;
+TRAP x25 ;
+XOR R0, R7, R3 ; Comment
+XOR R0, R7, #5 
+.FILL xFFFF
+.FILL x0000
+.FILL #-1
+.END
+
