@@ -574,12 +574,21 @@ int main(int argc, char *argv[]) {
 /***************************************************************/
 
 
+int getBit(int num, int i){
+  //printf("Num: %08X, %04X\n", num, pows(2, i));
+  return (num & pows(2, i)) >> i;
+}
+
 void eval_micro_sequencer() {
 
   /* 
    * Evaluate the address of the next state according to the 
    * micro sequencer logic. Latch the next microinstruction.
    */
+
+  if (getBit(NEXT_LATCHES.MICROINSTRUCTION, 26) == 1){
+    
+  }
 
 }
 
