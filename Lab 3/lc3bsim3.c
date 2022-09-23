@@ -574,10 +574,91 @@ int main(int argc, char *argv[]) {
 /***************************************************************/
 
 
+int pows(int num, int a){
+  //printf("Pows: %d, %d\n", num, a);
+  int res = 1;
+  for (int i = 0; i < a; i++){
+    res *= num;
+  }
+  return res;
+}
+
 int getBit(int num, int i){
   //printf("Num: %08X, %04X\n", num, pows(2, i));
   return (num & pows(2, i)) >> i;
 }
+
+int sext(int num, int orig, int new){
+  int sBit = getBit(num, orig-1);
+  //printf("sBit: %d\n", sBit);
+  if (sBit){ // true if negative num
+    return (num | ((pows(2, new-orig) -1) << (orig))) & (pows(2, new) - 1);
+  }
+  else
+    return num & (pows(2, new)-1); // Don't need to extend positive nums
+}
+
+int getReg(int num, int i){ // i is the lowest bit of the reg
+  return ((num & pows(2, i+2)) + (num & pows(2, i+1)) + (num & pows(2, i))) >> i;
+}
+
+int add16(int num1, int num2){
+  //printf("Add16: %08X %08X\n", sext(num1, 16, 32), sext(num2, 16, 32));
+  return (sext(num1, 16, 32) + sext(num2, 16, 32)) & 0xFFFF;
+}
+
+void setCC(int reg){
+  int val = sext(NEXT_LATCHES.REGS[reg], 16, 32);
+  //printf("CC Check: %04X\n", val);
+  NEXT_LATCHES.N = 0;
+  NEXT_LATCHES.Z = 0;
+  NEXT_LATCHES.P = 0;
+  if (val == 0){
+    NEXT_LATCHES.Z = 1;
+  }
+  else if (val < 0){
+    NEXT_LATCHES.N = 1;
+  }
+  else {
+    NEXT_LATCHES.P = 1;
+  }
+}
+
+int getWord(int Address) { // Pass the address in lc3b
+  // printf("Halves: %02X %02X\n", MEMORY[Address][1], MEMORY[Address][0]);
+  return MEMORY[Address >> 1][0] + (MEMORY[Address >> 1][1] << 8);
+  // MEMORY only holds bytes so we don't need to mask
+}
+
+int getByte(int Address) { // Pass the address in lc3b
+  // printf("Byte: %02X\n", MEMORY[Address >> 1][Address % 1]);
+  return MEMORY[Address >> 1][Address % 2];
+  // MEMORY only holds bytes so we don't need to mask
+}
+
+void writeWord(int Address, int word){
+  MEMORY[Address >> 1][0] = word & 0xFF;
+  MEMORY[Address >> 1][1] = (word & 0xFF00) >> 8;
+}
+
+void writeByte(int Address, int word){
+  MEMORY[Address >> 1][Address % 2] = word & 0xFF;
+}
+
+int rshfa(int word, int a){
+  int sBit = getBit(word, 15); // get sign bit
+  //printf("sBit: %d, a: %d\n", sBit, a);
+  if (sBit == 0)
+    return word >> a;  
+  //printf("word >> a: %04X, or: %04X\n", word >> a, (pows(2, a) - 1) << (16 - a));
+  return (word >> a) | ((pows(2, a) - 1) << (16 - a));
+}
+
+int getOpcode(int IR){
+    return ((IR & ((pows(2, 4)-1) << 12)) >> 12);
+}
+
+int memoryCount = 0;
 
 void eval_micro_sequencer() {
 
@@ -585,11 +666,35 @@ void eval_micro_sequencer() {
    * Evaluate the address of the next state according to the 
    * micro sequencer logic. Latch the next microinstruction.
    */
+  int* currU = CURRENT_LATCHES.MICROINSTRUCTION;
+  int nextJ;
 
-  if (getBit(NEXT_LATCHES.MICROINSTRUCTION, 26) == 1){
-    
+  if (GetIRD(currU)){
+    nextJ = getOpcode(CURRENT_LATCHES.IR);
+    // printf("IR: 0x%04X\n", CURRENT_LATCHES.IR);
+    memcpy(NEXT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[nextJ], sizeof(int)*CONTROL_STORE_BITS);
   }
+  else{
+    switch (GetCOND(currU)){
+        case 0: // 00
+            nextJ = GetJ(currU);
+            break;
+        case 1: // 01
+            nextJ = GetJ(currU) | (CURRENT_LATCHES.READY << 1);
+            break;
+        case 2: // 10
+            nextJ = GetJ(currU) | (CURRENT_LATCHES.BEN << 2);
+            break;
+        case 3: // 11
+            nextJ = GetJ(currU) | (getBit(CURRENT_LATCHES.IR, 11));
+            break;
+        default:
+            break;
+    }
 
+    memcpy(NEXT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[nextJ], sizeof(int)*CONTROL_STORE_BITS);
+  }
+//   printf("Next state: %02d, IRD: %d\n", nextJ, GetIRD(currU));
 }
 
 
