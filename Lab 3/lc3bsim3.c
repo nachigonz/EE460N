@@ -736,7 +736,7 @@ void cycle_memory() {
   }
 }
 
-
+int BusNext;
 
 void eval_bus_drivers() {
 
@@ -749,7 +749,45 @@ void eval_bus_drivers() {
    *		 Gate_SHF,
    *		 Gate_MDR.
    */    
+  int* curr = CURRENT_LATCHES.MICROINSTRUCTION;
 
+  if (GetGATE_ALU(curr)){ // SR1Out, SR2Out, SR1Mux, Sr1Mux, ALUK
+    int OP1;
+    int SR1;
+    int OP2;
+    int SR2;
+    if (GetSR1MUX(curr)){
+        SR1 = getReg(CURRENT_LATCHES.IR, 6);
+    }
+    else{
+        SR1 = getReg(CURRENT_LATCHES.IR, 9);
+    }
+    OP1 = CURRENT_LATCHES.REGS[SR1];
+    if (getBit(CURRENT_LATCHES.IR, 5)){ // imm5
+        OP2 = sext(CURRENT_LATCHES.IR & 0x1F, 5, 16);
+    }
+    else{ // SR2
+        SR2 = getReg(CURRENT_LATCHES.IR, 0);
+        OP2 = CURRENT_LATCHES.REGS[SR2];
+    }
+    switch (GetALUK(curr)){
+        case 0: // Add
+            BusNext = add16(OP1, OP2);
+            break;
+        case 1: // AND
+            BusNext = OP1 & OP2;
+            break;
+        case 2: // XOR
+            BusNext = OP1 ^ OP2;
+            break;
+        case 3:
+            BusNext = OP1;
+            break;
+    }
+  }
+  if (GetGATE_MARMUX(curr)){ // SR1Out, SR1Mux, ADDR1Mux, LSHF1, ADDR2Mux, MARMUX
+    
+  }
 }
 
 
