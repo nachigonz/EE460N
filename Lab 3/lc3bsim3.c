@@ -694,7 +694,7 @@ void eval_micro_sequencer() {
 
     memcpy(NEXT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[nextJ], sizeof(int)*CONTROL_STORE_BITS);
   }
-//   printf("Next state: %02d, IRD: %d\n", nextJ, GetIRD(currU));
+  printf("Next state: %02d, Curr Ready: %d\n", nextJ, CURRENT_LATCHES.READY);
 }
 
 
@@ -707,6 +707,33 @@ void cycle_memory() {
    * cycle to prepare microsequencer for the fifth cycle.  
    */
 
+  if(GetMIO_EN(CURRENT_LATCHES.MICROINSTRUCTION)){
+    if (++memoryCount == 4){ // 4th cycle
+        NEXT_LATCHES.READY = 1;
+    }
+    else if (memoryCount == 5){ // 5th cycle
+        NEXT_LATCHES.READY = 0;
+        memoryCount = 0;
+
+        // Read/write stuff with memory:
+        if (GetR_W(CURRENT_LATCHES.MICROINSTRUCTION)){ // Write
+            if (GetDATA_SIZE(CURRENT_LATCHES.MICROINSTRUCTION)){ // Word
+                writeWord(CURRENT_LATCHES.MAR, CURRENT_LATCHES.MDR);
+            }
+            else { // Byte
+                if (CURRENT_LATCHES.MAR & 0x01){ // Upper byte
+                    writeByte(CURRENT_LATCHES.MAR, CURRENT_LATCHES.MDR & 0xFF00);
+                }
+                else { // Lower byte
+                    writeByte(CURRENT_LATCHES.MAR, CURRENT_LATCHES.MDR & 0x00FF);
+                }
+            }
+        }
+        else { // Read
+            NEXT_LATCHES.MDR = getWord(CURRENT_LATCHES.MAR); // No need to 0 the [0] since I'm getting the whole word anyways
+        }
+    }
+  }
 }
 
 
