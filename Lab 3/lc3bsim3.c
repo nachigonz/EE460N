@@ -694,6 +694,7 @@ void eval_micro_sequencer() {
 
     memcpy(NEXT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[nextJ], sizeof(int)*CONTROL_STORE_BITS);
   }
+  NEXT_LATCHES.STATE_NUMBER = nextJ;
 //   printf("Next state: %02d, Curr Ready: %d\n", nextJ, NEXT_LATCHES.READY);
 }
 
@@ -825,7 +826,7 @@ void eval_bus_drivers() {
         BusNext = NEXT_LATCHES.MDR;
     }
     else{ // Byte
-        if (GetBit(NEXT_LATCHES.MAR, 0)){ // Upper byte
+        if (getBit(NEXT_LATCHES.MAR, 0)){ // Upper byte
             BusNext = (NEXT_LATCHES.MDR & 0xFF00) >> 8;
         }
         else { // Lower Byte
@@ -920,7 +921,7 @@ void latch_datapath_values() {
             NEXT_LATCHES.REGS[getReg(NEXT_LATCHES.IR, 9)] = BUS;
         }
     }
-    if(getLD_CC(curr)){
+    if(GetLD_CC(curr)){
         NEXT_LATCHES.N = BUS < 0;
         NEXT_LATCHES.Z = BUS == 0;
         NEXT_LATCHES.P = BUS > 0;
@@ -933,7 +934,7 @@ void latch_datapath_values() {
             case 1: // Bus
                 NEXT_LATCHES.PC = BUS;
                 break;
-            case 2: // Adder
+            case 2: {// Adder
                 int OP1;
                 int OP2;
                 switch (GetADDR2MUX(curr)){
@@ -966,6 +967,7 @@ void latch_datapath_values() {
                 }
                 NEXT_LATCHES.PC = add16(OP1, OP2);
                 break;
+            }
             case 3:
                 break;
         }
