@@ -721,12 +721,7 @@ void cycle_memory() {
                 writeWord(NEXT_LATCHES.MAR, NEXT_LATCHES.MDR);
             }
             else { // Byte
-                if (NEXT_LATCHES.MAR & 0x01){ // Upper byte
-                    writeByte(NEXT_LATCHES.MAR, (NEXT_LATCHES.MDR & 0xFF00) >> 8);
-                }
-                else { // Lower byte
-                    writeByte(NEXT_LATCHES.MAR, NEXT_LATCHES.MDR & 0x00FF);
-                }
+                writeByte(NEXT_LATCHES.MAR, NEXT_LATCHES.MDR & 0x00FF);
             }
         }
         else { // Read
@@ -880,6 +875,8 @@ void drive_bus() {
    * tristate drivers. 
    */       
 
+  BUS = BusNext;
+
 }
 
 
@@ -891,5 +888,22 @@ void latch_datapath_values() {
    * require sourcing the bus; therefore, this routine has to come 
    * after drive_bus.
    */       
+
+    int* curr = CURRENT_LATCHES.MICROINSTRUCTION;
+
+    if (GetLD_MAR(curr)){
+        NEXT_LATCHES.MAR = BUS;
+    }
+    if (GetLD_MDR(curr)){
+        if (!GetMIO_EN(curr)){
+            if(GetDATA_SIZE(curr)){ // Word
+                NEXT_LATCHES.MDR = BUS;
+            }
+            else { // Byte
+                NEXT_LATCHES.MDR = BUS & 0x00FF;
+            }
+        }
+    }
+    
 
 }
