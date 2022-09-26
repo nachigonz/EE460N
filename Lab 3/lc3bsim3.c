@@ -904,6 +904,71 @@ void latch_datapath_values() {
             }
         }
     }
-    
+    if (GetLD_IR(curr)){
+        NEXT_LATCHES.IR = BUS;
+    }
+    if (GetLD_BEN(curr)){
+        NEXT_LATCHES.BEN = getBit(NEXT_LATCHES.IR, 11) & NEXT_LATCHES.N;
+        NEXT_LATCHES.BEN |= getBit(NEXT_LATCHES.IR, 10) & NEXT_LATCHES.Z;
+        NEXT_LATCHES.BEN |= getBit(NEXT_LATCHES.IR, 9) & NEXT_LATCHES.P;
+    }
+    if (GetLD_REG(curr)){
+        if(GetDRMUX(curr)){ // R7
+            NEXT_LATCHES.REGS[7] = BUS;
+        }
+        else { // IR 11.9
+            NEXT_LATCHES.REGS[getReg(NEXT_LATCHES.IR, 9)] = BUS;
+        }
+    }
+    if(getLD_CC(curr)){
+        NEXT_LATCHES.N = BUS < 0;
+        NEXT_LATCHES.Z = BUS == 0;
+        NEXT_LATCHES.P = BUS > 0;
+    }
+    if(GetLD_PC(curr)){
+        switch(GetPCMUX(curr)){
+            case 0: // PC + 2
+                NEXT_LATCHES.PC += 2;
+                break;
+            case 1: // Bus
+                NEXT_LATCHES.PC = BUS;
+                break;
+            case 2: // Adder
+                int OP1;
+                int OP2;
+                switch (GetADDR2MUX(curr)){
+                    case 0: 
+                        OP1 = 0;
+                        break;
+                    case 1:
+                        OP1 = sext(NEXT_LATCHES.IR & 0x3F, 6, 16);
+                        break;
+                    case 2:
+                        OP1 = sext(NEXT_LATCHES.IR & 0x1FF, 9, 16);
+                        break;
+                    case 3:
+                        OP1 = sext(NEXT_LATCHES.IR & 0x7FF, 11, 16);
+                        break;
+                }
+                if (GetLSHF1(curr)) OP1 = OP1 << 1;
+                if (GetADDR1MUX(curr)){ // Get SR1
+                    int SR;
+                    if (GetSR1MUX(curr)){
+                        SR = getReg(NEXT_LATCHES.IR, 6);
+                    }
+                    else{
+                        SR = getReg(NEXT_LATCHES.IR, 9);
+                    }
+                    OP2 = NEXT_LATCHES.REGS[SR];
+                }
+                else { // Get PC
+                    OP2 = NEXT_LATCHES.PC;
+                }
+                NEXT_LATCHES.PC = add16(OP1, OP2);
+                break;
+            case 3:
+                break;
+        }
+    }
 
 }
