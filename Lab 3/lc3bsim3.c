@@ -607,8 +607,8 @@ int add16(int num1, int num2){
   return (sext(num1, 16, 32) + sext(num2, 16, 32)) & 0xFFFF;
 }
 
-void setCC(int reg){
-  int val = sext(NEXT_LATCHES.REGS[reg], 16, 32);
+void setCC(){
+  int val = sext(BUS, 16, 32);
   //printf("CC Check: %04X\n", val);
   NEXT_LATCHES.N = 0;
   NEXT_LATCHES.Z = 0;
@@ -922,9 +922,7 @@ void latch_datapath_values() {
         }
     }
     if(GetLD_CC(curr)){
-        NEXT_LATCHES.N = BUS < 0;
-        NEXT_LATCHES.Z = BUS == 0;
-        NEXT_LATCHES.P = BUS > 0;
+        setCC();
     }
     if(GetLD_PC(curr)){
         switch(GetPCMUX(curr)){
