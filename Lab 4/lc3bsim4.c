@@ -65,8 +65,8 @@ enum CS_BITS {
     GATE_MARMUX,
     GATE_SHF,
     PCMUX1, PCMUX0,
-    DRMUX,
-    SR1MUX,
+    DRMUX1, DRMUX0,
+    SR1MUX1, SR1MUX0,
     ADDR1MUX,
     ADDR2MUX1, ADDR2MUX0,
     MARMUX,
@@ -75,13 +75,13 @@ enum CS_BITS {
     R_W,
     DATA_SIZE,
     LSHF1,
-    LD_TEMP,
-    LD_PSR,
-    GATE_PSR,
-    MARPSR,
-    SRSMUX,
-    DRSMUX,
     ALUMUX,
+    GATE_TEMP,
+    LD_TEMP,
+    LD_PRIV,
+    LD_PRIO,
+    PSRMUX,
+    GATE_PSR,
 /* MODIFY: you have to add all your new control signals */
     CONTROL_STORE_BITS
 } CS_BITS;
@@ -107,8 +107,8 @@ int GetGATE_ALU(int *x)      { return(x[GATE_ALU]); }
 int GetGATE_MARMUX(int *x)   { return(x[GATE_MARMUX]); }
 int GetGATE_SHF(int *x)      { return(x[GATE_SHF]); }
 int GetPCMUX(int *x)         { return((x[PCMUX1] << 1) + x[PCMUX0]); }
-int GetDRMUX(int *x)         { return(x[DRMUX]); }
-int GetSR1MUX(int *x)        { return(x[SR1MUX]); }
+int GetDRMUX(int *x)         { return((x[DRMUX1] << 1) + x[DRMUX0]); }
+int GetSR1MUX(int *x)        { return((x[SR1MUX1] << 1) + x[SR1MUX0]); }
 int GetADDR1MUX(int *x)      { return(x[ADDR1MUX]); }
 int GetADDR2MUX(int *x)      { return((x[ADDR2MUX1] << 1) + x[ADDR2MUX0]); }
 int GetMARMUX(int *x)        { return(x[MARMUX]); }
@@ -117,13 +117,13 @@ int GetMIO_EN(int *x)        { return(x[MIO_EN]); }
 int GetR_W(int *x)           { return(x[R_W]); }
 int GetDATA_SIZE(int *x)     { return(x[DATA_SIZE]); } 
 int GetLSHF1(int *x)         { return(x[LSHF1]); }
-int GetLD_TEMP(int *x)       { return(x[LD_TEMP]); }
-int GetLD_PSR(int *x)        { return(x[LD_PSR]); }
-int GetGATE_PSR(int *x)      { return(x[GATE_PSR]); }
-int GetMARPSR(int *x)        { return(x[MARPSR]); }
-int GetSRSMUX(int *x)        { return(x[SRSMUX]); }
-int GetDRSMUX(int *x)        { return(x[DRSMUX]); }
 int GetALUMUX(int *x)        { return(x[ALUMUX]); }
+int GetGATE_TEMP(int *x)     { return(x[GATE_TEMP]); }
+int GetLD_TEMP(int *x)       { return(x[LD_TEMP]); }
+int GetLD_PRIV(int *x)       { return(x[LD_PRIV]); }
+int GetLD_PRIO(int *x)       { return(x[LD_PRIO]); }
+int GetPSRMUX(int *x)        { return(x[PSRMUX]); }
+int GetGATE_PSR(int *x)      { return(x[GATE_PSR]); }
 /* MODIFY: you can add more Get functions for your new control signals */
 
 /***************************************************************/
@@ -540,7 +540,7 @@ void initialize(char *argv[], int num_prog_files) {
     CURRENT_LATCHES.STATE_NUMBER = INITIAL_STATE_NUMBER;
     memcpy(CURRENT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[INITIAL_STATE_NUMBER], sizeof(int)*CONTROL_STORE_BITS);
     CURRENT_LATCHES.SSP = 0x3000; /* Initial value of system stack pointer */
-    CURRENT_LATCHES.PSR = 0x8001; // Initialize to user mode with Z = 1
+    CURRENT_LATCHES.PSR = 0x8001; // Initialize to user mode with Z = 1 and priority 0
 
     NEXT_LATCHES = CURRENT_LATCHES;
 
@@ -633,8 +633,8 @@ int add16(int num1, int num2){
   return (sext(num1, 16, 32) + sext(num2, 16, 32)) & 0xFFFF;
 }
 
-void setCC(int input){
-  int val = sext(input, 16, 32);
+void setCC(){
+  int val = sext(BUS, 16, 32);
   //printf("CC Check: %04X\n", val);
   NEXT_LATCHES.N = 0;
   NEXT_LATCHES.Z = 0;
@@ -692,37 +692,36 @@ void eval_micro_sequencer() {
    * Evaluate the address of the next state according to the 
    * micro sequencer logic. Latch the next microinstruction.
    */
+  int* currU = CURRENT_LATCHES.MICROINSTRUCTION;
+  int nextJ;
 
-    int* currU = CURRENT_LATCHES.MICROINSTRUCTION;
-    int nextJ;
-
-    if (GetIRD(currU)){
-        nextJ = getOpcode(NEXT_LATCHES.IR);
-        // printf("IR: 0x%04X\n", CURRENT_LATCHES.IR);
-        memcpy(NEXT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[nextJ], sizeof(int)*CONTROL_STORE_BITS);
+  if (GetIRD(currU)){
+    nextJ = getOpcode(NEXT_LATCHES.IR);
+    // printf("IR: 0x%04X\n", CURRENT_LATCHES.IR);
+    memcpy(NEXT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[nextJ], sizeof(int)*CONTROL_STORE_BITS);
+  }
+  else{
+    switch (GetCOND(currU)){
+        case 0: // 00
+            nextJ = GetJ(currU);
+            break;
+        case 1: // 01
+            nextJ = GetJ(currU) | (NEXT_LATCHES.READY << 1);
+            break;
+        case 2: // 10
+            nextJ = GetJ(currU) | (NEXT_LATCHES.BEN << 2);
+            break;
+        case 3: // 11
+            nextJ = GetJ(currU) | (getBit(NEXT_LATCHES.IR, 11));
+            break;
+        default:
+            break;
     }
-    else{
-        switch (GetCOND(currU)){
-            case 0: // 00
-                nextJ = GetJ(currU);
-                break;
-            case 1: // 01
-                nextJ = GetJ(currU) | (NEXT_LATCHES.READY << 1);
-                break;
-            case 2: // 10
-                nextJ = GetJ(currU) | (NEXT_LATCHES.BEN << 2);
-                break;
-            case 3: // 11
-                nextJ = GetJ(currU) | (getBit(NEXT_LATCHES.IR, 11));
-                break;
-            default:
-                break;
-        }
 
-        memcpy(NEXT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[nextJ], sizeof(int)*CONTROL_STORE_BITS);
-    }
-    NEXT_LATCHES.STATE_NUMBER = nextJ;
-    //   printf("Next state: %02d, Curr Ready: %d\n", nextJ, NEXT_LATCHES.READY);
+    memcpy(NEXT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[nextJ], sizeof(int)*CONTROL_STORE_BITS);
+  }
+  NEXT_LATCHES.STATE_NUMBER = nextJ;
+//   printf("Next state: %02d, Curr Ready: %d\n", nextJ, NEXT_LATCHES.READY);
 }
 
 
@@ -735,28 +734,28 @@ void cycle_memory() {
    * cycle to prepare microsequencer for the fifth cycle.  
    */
 
-    if(GetMIO_EN(CURRENT_LATCHES.MICROINSTRUCTION)){
-        if (++memoryCount == 4){ // 4th cycle
-            NEXT_LATCHES.READY = 1;
-        }
-        else if (memoryCount == 5){ // 5th cycle
-            NEXT_LATCHES.READY = 0;
-            memoryCount = 0;
+  if(GetMIO_EN(CURRENT_LATCHES.MICROINSTRUCTION)){
+    if (++memoryCount == 4){ // 4th cycle
+        NEXT_LATCHES.READY = 1;
+    }
+    else if (memoryCount == 5){ // 5th cycle
+        NEXT_LATCHES.READY = 0;
+        memoryCount = 0;
 
-            // Read/write stuff with memory:
-            if (GetR_W(CURRENT_LATCHES.MICROINSTRUCTION)){ // Write
-                if (GetDATA_SIZE(CURRENT_LATCHES.MICROINSTRUCTION)){ // Word
-                    writeWord(NEXT_LATCHES.MAR, NEXT_LATCHES.MDR);
-                }
-                else { // Byte
-                    writeByte(NEXT_LATCHES.MAR, NEXT_LATCHES.MDR & 0x00FF);
-                }
+        // Read/write stuff with memory:
+        if (GetR_W(CURRENT_LATCHES.MICROINSTRUCTION)){ // Write
+            if (GetDATA_SIZE(CURRENT_LATCHES.MICROINSTRUCTION)){ // Word
+                writeWord(NEXT_LATCHES.MAR, NEXT_LATCHES.MDR);
             }
-            else { // Read
-                NEXT_LATCHES.MDR = getWord(NEXT_LATCHES.MAR); // No need to 0 the [0] since I'm getting the whole word anyways
+            else { // Byte
+                writeByte(NEXT_LATCHES.MAR, NEXT_LATCHES.MDR & 0x00FF);
             }
+        }
+        else { // Read
+            NEXT_LATCHES.MDR = getWord(NEXT_LATCHES.MAR); // No need to 0 the [0] since I'm getting the whole word anyways
         }
     }
+  }
 }
 
 int BusNext;
@@ -770,140 +769,129 @@ void eval_bus_drivers() {
    *		 Gate_PC,
    *		 Gate_ALU,
    *		 Gate_SHF,
-   *		 Gate_MDR,
-             Gate_PSR
+   *		 Gate_MDR.
    */    
+  int* curr = CURRENT_LATCHES.MICROINSTRUCTION;
 
-    int* curr = CURRENT_LATCHES.MICROINSTRUCTION;
-
-    if (GetGATE_ALU(curr)){ // SR1Out, SR2Out, SR1Mux, Sr1Mux, ALUK
+  if (GetGATE_ALU(curr)){ // SR1Out, SR2Out, SR1Mux, Sr1Mux, ALUK
+    int OP1;
+    int SR1;
+    int OP2;
+    int SR2;
+    if (GetSR1MUX(curr)){
+        SR1 = getReg(NEXT_LATCHES.IR, 6);
+    }
+    else{
+        SR1 = getReg(NEXT_LATCHES.IR, 9);
+    }
+    OP1 = NEXT_LATCHES.REGS[SR1];
+    if (getBit(NEXT_LATCHES.IR, 5)){ // imm5
+        OP2 = sext(NEXT_LATCHES.IR & 0x1F, 5, 16);
+    }
+    else{ // SR2
+        SR2 = getReg(NEXT_LATCHES.IR, 0);
+        OP2 = NEXT_LATCHES.REGS[SR2];
+    }
+    switch (GetALUK(curr)){
+        case 0: // Add
+            BusNext = add16(OP1, OP2);
+            break;
+        case 1: // AND
+            BusNext = OP1 & OP2;
+            break;
+        case 2: // XOR
+            BusNext = OP1 ^ OP2;
+            break;
+        case 3:
+            BusNext = OP1;
+            break;
+    }
+  }
+  if (GetGATE_MARMUX(curr)){ // SR1Out, SR1Mux, ADDR1Mux, LSHF1, ADDR2Mux, MARMUX
+    if(GetMARMUX(curr)){ //Address Adder
         int OP1;
-        int SR1;
         int OP2;
-        int SR2;
-        if (GetSR1MUX(curr)){
-            SR1 = getReg(NEXT_LATCHES.IR, 6);
-        }
-        else{
-            SR1 = getReg(NEXT_LATCHES.IR, 9);
-        }
-        if (GetSRSMUX(curr)){
-            SR1 = 6;
-        }
-        OP1 = NEXT_LATCHES.REGS[SR1];
-        if (getBit(NEXT_LATCHES.IR, 5)){ // imm5
-            OP2 = sext(NEXT_LATCHES.IR & 0x1F, 5, 16);
-        }
-        else{ // SR2
-            SR2 = getReg(NEXT_LATCHES.IR, 0);
-            OP2 = NEXT_LATCHES.REGS[SR2];
-        }
-        if (GetALUMUX(curr)){
-            OP2 = 2;
-        }
-        switch (GetALUK(curr)){
-            case 0: // Add
-                BusNext = add16(OP1, OP2);
+        switch (GetADDR2MUX(curr)){
+            case 0: 
+                OP1 = 0;
                 break;
-            case 1: // AND
-                BusNext = OP1 & OP2;
+            case 1:
+                OP1 = sext(NEXT_LATCHES.IR & 0x3F, 6, 16);
                 break;
-            case 2: // XOR
-                BusNext = OP1 ^ OP2;
+            case 2:
+                OP1 = sext(NEXT_LATCHES.IR & 0x1FF, 9, 16);
                 break;
             case 3:
-                BusNext = OP1;
+                OP1 = sext(NEXT_LATCHES.IR & 0x7FF, 11, 16);
                 break;
         }
+        if (GetLSHF1(curr)) OP1 = OP1 << 1;
+        if (GetADDR1MUX(curr)){ // Get SR1
+            int SR;
+            if (GetSR1MUX(curr)){
+                SR = getReg(NEXT_LATCHES.IR, 6);
+            }
+            else{
+                SR = getReg(NEXT_LATCHES.IR, 9);
+            }
+            OP2 = NEXT_LATCHES.REGS[SR];
+        }
+        else { // Get PC
+            OP2 = NEXT_LATCHES.PC;
+        }
+        BusNext = add16(OP1, OP2);
     }
-    if (GetGATE_MARMUX(curr)){ // SR1Out, SR1Mux, ADDR1Mux, LSHF1, ADDR2Mux, MARMUX
-        if(GetMARMUX(curr)){ //Address Adder
-            int OP1;
-            int OP2;
-            switch (GetADDR2MUX(curr)){
-                case 0: 
-                    OP1 = 0;
-                    break;
-                case 1:
-                    OP1 = sext(NEXT_LATCHES.IR & 0x3F, 6, 16);
-                    break;
-                case 2:
-                    OP1 = sext(NEXT_LATCHES.IR & 0x1FF, 9, 16);
-                    break;
-                case 3:
-                    OP1 = sext(NEXT_LATCHES.IR & 0x7FF, 11, 16);
-                    break;
-            }
-            if (GetLSHF1(curr)) OP1 = OP1 << 1;
-            if (GetADDR1MUX(curr)){ // Get SR1
-                int SR;
-                if (GetSR1MUX(curr)){
-                    SR = getReg(NEXT_LATCHES.IR, 6);
-                }
-                else{
-                    SR = getReg(NEXT_LATCHES.IR, 9);
-                }
-                OP2 = NEXT_LATCHES.REGS[SR];
-            }
-            else { // Get PC
-                OP2 = NEXT_LATCHES.PC;
-            }
-            BusNext = add16(OP1, OP2);
-        }
-        else{ // 7-0 Vector
-            int mar = NEXT_LATCHES.IR & 0x00FF;
-            mar = mar << 1;
-            BusNext = mar;
-        }
+    else{ // 7-0 Vector
+        int mar = NEXT_LATCHES.IR & 0x00FF;
+        mar = mar << 1;
+        BusNext = mar;
     }
-    if (GetGATE_MDR(curr)){
-        if (GetDATA_SIZE(curr)){ // Word
-            BusNext = NEXT_LATCHES.MDR;
-        }
-        else{ // Byte
-            if (getBit(NEXT_LATCHES.MAR, 0)){ // Upper byte
-                BusNext = (NEXT_LATCHES.MDR & 0xFF00) >> 8;
-            }
-            else { // Lower Byte
-                BusNext = NEXT_LATCHES.MDR & 0x00FF;
-            }
-            BusNext = sext(BusNext, 8, 16);
-        }
+  }
+  if (GetGATE_MDR(curr)){
+    if (GetDATA_SIZE(curr)){ // Word
+        BusNext = NEXT_LATCHES.MDR;
     }
-    if (GetGATE_PC(curr)){
-        BusNext = NEXT_LATCHES.PC;
+    else{ // Byte
+        if (getBit(NEXT_LATCHES.MAR, 0)){ // Upper byte
+            BusNext = (NEXT_LATCHES.MDR & 0xFF00) >> 8;
+        }
+        else { // Lower Byte
+            BusNext = NEXT_LATCHES.MDR & 0x00FF;
+        }
+        BusNext = sext(BusNext, 8, 16);
     }
-    if (GetGATE_SHF(curr)){ // SR1Out, SR1Mux, IR[5:0]
-        int SR;
-        int OP;
-        if (GetSR1MUX(curr)){
-            SR = getReg(NEXT_LATCHES.IR, 6);
-        }
-        else{
-            SR = getReg(NEXT_LATCHES.IR, 9);
-        }
-        OP = NEXT_LATCHES.REGS[SR];
+  }
+  if (GetGATE_PC(curr)){
+    BusNext = NEXT_LATCHES.PC;
+  }
+  if (GetGATE_SHF(curr)){ // SR1Out, SR1Mux, IR[5:0]
+    int SR;
+    int OP;
+    if (GetSR1MUX(curr)){
+        SR = getReg(NEXT_LATCHES.IR, 6);
+    }
+    else{
+        SR = getReg(NEXT_LATCHES.IR, 9);
+    }
+    OP = NEXT_LATCHES.REGS[SR];
 
-        int shiftBits = (NEXT_LATCHES.IR & 0x30) >> 4;
-        int shift = NEXT_LATCHES.IR & 0x0F;
+    int shiftBits = (NEXT_LATCHES.IR & 0x30) >> 4;
+    int shift = NEXT_LATCHES.IR & 0x0F;
 
-        switch (shiftBits){
-            case 0: // LSHF
-                BusNext = (OP << shift) & 0xFFFF;
-                break;
-            case 1: // RSHFL
-                BusNext = (OP >> shift) & 0xFFFF;
-                break;
-            case 3: // RSHFA
-                BusNext = rshfa(OP, shift);
-                break;
-            default:
-                break;
-        }
+    switch (shiftBits){
+        case 0: // LSHF
+            BusNext = (OP << shift) & 0xFFFF;
+            break;
+        case 1: // RSHFL
+            BusNext = (OP >> shift) & 0xFFFF;
+            break;
+        case 3: // RSHFA
+            BusNext = rshfa(OP, shift);
+            break;
+        default:
+            break;
     }
-    if(getGATE_PSR(curr)){
-        BusNext = NEXT_LATCHES.PSR;
-    }
+  }
 }
 
 
@@ -914,7 +902,8 @@ void drive_bus() {
    * tristate drivers. 
    */       
 
-    BUS = BusNext;
+  BUS = BusNext;
+
 }
 
 
@@ -951,10 +940,7 @@ void latch_datapath_values() {
         NEXT_LATCHES.BEN |= getBit(NEXT_LATCHES.IR, 9) & NEXT_LATCHES.P;
     }
     if (GetLD_REG(curr)){
-        if (GetDRSMUX(curr)){
-            NEXT_LATCHES.REGS[6] = BUS;
-        }
-        else if(GetDRMUX(curr)){ // R7
+        if(GetDRMUX(curr)){ // R7
             NEXT_LATCHES.REGS[7] = BUS;
         }
         else { // IR 11.9
@@ -962,26 +948,7 @@ void latch_datapath_values() {
         }
     }
     if(GetLD_CC(curr)){
-        setCC(BUS);
-    }
-    if(GetLD_TEMP(curr)){
-        NEXT_LATCHES.TEMP = BUS;
-    }
-    if(GetLD_PSR(curr)){
-        if (GetMARPSR(curr)){
-            NEXT_LATCHES.PSR = NEXT_LATCHES.TEMP;
-        }
-        else {
-            int tempPSR;
-            tempPSR = NEXT_LATCHES.PSR & 0xFFF8; // Erase NZP bits
-            tempPSR += NEXT_LATCHES.N << 2;
-            tempPSR += NEXT_LATCHES.Z << 1;
-            tempPSR += NEXT_LATCHES.P;
-            NEXT_LATCHES.PSR = tempPSR;
-        }
-        NEXT_LATCHES.N = getBit(NEXT_LATCHES.PSR, 2);
-        NEXT_LATCHES.Z = getBit(NEXT_LATCHES.PSR, 1);
-        NEXT_LATCHES.P = getBit(NEXT_LATCHES.PSR, 0);
+        setCC();
     }
     if(GetLD_PC(curr)){
         switch(GetPCMUX(curr)){
