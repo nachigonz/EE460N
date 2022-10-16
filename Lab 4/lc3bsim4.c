@@ -50,7 +50,7 @@ void latch_datapath_values();
 /***************************************************************/
 enum CS_BITS {                                                  
     IRD,
-    COND1, COND0,
+    COND2, COND1, COND0,
     J5, J4, J3, J2, J1, J0,
     LD_MAR,
     LD_MDR,
@@ -75,13 +75,20 @@ enum CS_BITS {
     R_W,
     DATA_SIZE,
     LSHF1,
-    ALUMUX,
     GATE_TEMP,
     LD_TEMP,
     LD_PRIV,
     LD_PRIO,
     PSRMUX,
     GATE_PSR,
+    LD_SSP,
+    LD_USP,
+    SPMUX1, SPMUX0,
+    GATE_SP,
+    GATE_OLDPC,
+    LD_VECT,
+    GATE_VECT,
+    VECTMUX,
 /* MODIFY: you have to add all your new control signals */
     CONTROL_STORE_BITS
 } CS_BITS;
@@ -90,7 +97,7 @@ enum CS_BITS {
 /* Functions to get at the control bits.                       */
 /***************************************************************/
 int GetIRD(int *x)           { return(x[IRD]); }
-int GetCOND(int *x)          { return((x[COND1] << 1) + x[COND0]); }
+int GetCOND(int *x)          { return((x[COND2] << 2) + (x[COND1] << 1) + x[COND0]); }
 int GetJ(int *x)             { return((x[J5] << 5) + (x[J4] << 4) +
 				      (x[J3] << 3) + (x[J2] << 2) +
 				      (x[J1] << 1) + x[J0]); }
@@ -117,13 +124,20 @@ int GetMIO_EN(int *x)        { return(x[MIO_EN]); }
 int GetR_W(int *x)           { return(x[R_W]); }
 int GetDATA_SIZE(int *x)     { return(x[DATA_SIZE]); } 
 int GetLSHF1(int *x)         { return(x[LSHF1]); }
-int GetALUMUX(int *x)        { return(x[ALUMUX]); }
 int GetGATE_TEMP(int *x)     { return(x[GATE_TEMP]); }
 int GetLD_TEMP(int *x)       { return(x[LD_TEMP]); }
 int GetLD_PRIV(int *x)       { return(x[LD_PRIV]); }
 int GetLD_PRIO(int *x)       { return(x[LD_PRIO]); }
 int GetPSRMUX(int *x)        { return(x[PSRMUX]); }
 int GetGATE_PSR(int *x)      { return(x[GATE_PSR]); }
+int GetLD_SSP(int *x)        { return(x[LD_SSP]); }
+int GetLD_USP(int *x)        { return(x[LD_USP]); }
+int GetSPMUX(int *x)         { return((x[SPMUX1] << 1) + x[SPMUX0]); }
+int GetGATE_SP(int *x)       { return(x[GATE_SP]); }
+int GetGATE_OLDPC(int *x)    { return(x[GATE_OLDPC]); }
+int GetLD_VECT(int *x)       { return(x[LD_VECT]); }
+int GetGATE_VECT(int *x)     { return(x[GATE_VECT]); }
+int GetVECTMUX(int *x)       { return(x[VECTMUX]); }
 /* MODIFY: you can add more Get functions for your new control signals */
 
 /***************************************************************/
@@ -183,7 +197,11 @@ int EXCV; /* Exception vector register */
 int SSP; /* Initial value of system stack pointer */
 /* MODIFY: You may add system latches that are required by your implementation */
 
-int PSR, TEMP;
+int TEMP;
+int INT, INT_PRIO;
+int PRIV, PRIO;
+int SAVED_SSP, SAVED_USP;
+int VECT_REG;
 
 } System_Latches;
 
@@ -227,6 +245,15 @@ void cycle() {
   eval_bus_drivers();
   drive_bus();
   latch_datapath_values();
+
+   /*
+        SIMULATING AN INTERRUPT TIMER:
+  */
+  if (CYCLE_COUNT == 300){
+    NEXT_LATCHES.INTV = 0x01;
+    NEXT_LATCHES.INT_PRIO = 0x01;
+    NEXT_LATCHES.INT = 1;
+  }
 
   CURRENT_LATCHES = NEXT_LATCHES;
 
@@ -540,7 +567,9 @@ void initialize(char *argv[], int num_prog_files) {
     CURRENT_LATCHES.STATE_NUMBER = INITIAL_STATE_NUMBER;
     memcpy(CURRENT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[INITIAL_STATE_NUMBER], sizeof(int)*CONTROL_STORE_BITS);
     CURRENT_LATCHES.SSP = 0x3000; /* Initial value of system stack pointer */
-    CURRENT_LATCHES.PSR = 0x8001; // Initialize to user mode with Z = 1 and priority 0
+
+    CURRENT_LATCHES.PRIV = 1; // Initialize to user mode with priority 0
+    CURRENT_LATCHES.PRIO = 0;
 
     NEXT_LATCHES = CURRENT_LATCHES;
 
@@ -714,6 +743,14 @@ void eval_micro_sequencer() {
         case 3: // 11
             nextJ = GetJ(currU) | (getBit(NEXT_LATCHES.IR, 11));
             break;
+        case 4: // User Privilege Mode
+            nextJ = GetJ(currU) | (NEXT_LATCHES.PRIV << 3);
+            break;
+        case 5: // Interrupt Present Check
+            if(NEXT_LATCHES.INT_PRIO > NEXT_LATCHES.PRIO){
+                nextJ = GetJ(currU) | (NEXT_LATCHES.INT << 4);
+            }
+            break;
         default:
             break;
     }
@@ -778,7 +815,10 @@ void eval_bus_drivers() {
     int SR1;
     int OP2;
     int SR2;
-    if (GetSR1MUX(curr)){
+    if (GetSR1MUX(curr) == 2){
+        SR1 = 6;
+    }
+    else if (GetSR1MUX(curr)){
         SR1 = getReg(NEXT_LATCHES.IR, 6);
     }
     else{
@@ -892,6 +932,41 @@ void eval_bus_drivers() {
             break;
     }
   }
+  if (GetGATE_TEMP(curr)){
+    BusNext = NEXT_LATCHES.TEMP;
+  }
+  if (GetGATE_PSR(curr)){
+    int psr = NEXT_LATCHES.P;
+    psr += NEXT_LATCHES.Z << 1;
+    psr += NEXT_LATCHES.N << 2;
+    psr += NEXT_LATCHES.PRIO << 8;
+    psr += NEXT_LATCHES.PRIV << 15;
+    BusNext = psr;
+  }
+  if (GetGATE_SP(curr)){
+    switch (GetSPMUX(curr)){
+        case 0:
+            BusNext = NEXT_LATCHES.REGS[6] + 2;
+            break;
+        case 1:
+            BusNext = NEXT_LATCHES.REGS[6] - 2;
+            break;
+        case 2:
+            BusNext = NEXT_LATCHES.SAVED_SSP;
+            break;
+        case 3:
+            BusNext = NEXT_LATCHES.SAVED_USP;
+            break;
+        default:
+            break;
+    }
+  }
+  if (GetGATE_OLDPC(curr)){
+    BusNext = NEXT_LATCHES.PC - 2;
+  }
+  if (GetGATE_VECT(curr)){
+    BusNext = NEXT_LATCHES.VECT_REG;
+  }
 }
 
 
@@ -918,6 +993,12 @@ void latch_datapath_values() {
 
     int* curr = CURRENT_LATCHES.MICROINSTRUCTION;
 
+    if (GetLD_USP(curr)){
+        NEXT_LATCHES.SAVED_USP = NEXT_LATCHES.REGS[6];
+    }
+    if (GetLD_SSP(curr)){
+        NEXT_LATCHES.SAVED_SSP = NEXT_LATCHES.REGS[6];
+    }
     if (GetLD_MAR(curr)){
         NEXT_LATCHES.MAR = BUS;
     }
@@ -940,7 +1021,10 @@ void latch_datapath_values() {
         NEXT_LATCHES.BEN |= getBit(NEXT_LATCHES.IR, 9) & NEXT_LATCHES.P;
     }
     if (GetLD_REG(curr)){
-        if(GetDRMUX(curr)){ // R7
+        if (GetDRMUX(curr) == 2){
+            NEXT_LATCHES.REGS[6] = BUS;
+        }
+        else if(GetDRMUX(curr)){ // R7
             NEXT_LATCHES.REGS[7] = BUS;
         }
         else { // IR 11.9
@@ -948,7 +1032,14 @@ void latch_datapath_values() {
         }
     }
     if(GetLD_CC(curr)){
-        setCC();
+        if (GetPSRMUX(curr)){
+            NEXT_LATCHES.N = (BUS & 4) >> 2;
+            NEXT_LATCHES.Z = (BUS & 2) >> 1;
+            NEXT_LATCHES.P = (BUS & 1);
+        }
+        else {
+            setCC();
+        }
     }
     if(GetLD_PC(curr)){
         switch(GetPCMUX(curr)){
@@ -996,5 +1087,31 @@ void latch_datapath_values() {
                 break;
         }
     }
-
+    if (GetLD_TEMP(curr)){
+        NEXT_LATCHES.TEMP = BUS;
+    }
+    if (GetLD_PRIV(curr)){
+        if (GetPSRMUX(curr)){
+            NEXT_LATCHES.PRIV = 0;
+        }
+        else{
+            NEXT_LATCHES.PRIV = getBit(BUS, 15);
+        }
+    }
+    if (GetLD_PRIO(curr)){
+        if (GetPSRMUX(curr)){
+            NEXT_LATCHES.PRIV = 0;
+        }
+        else{
+            NEXT_LATCHES.PRIV = getBit(BUS, 15);
+        }
+    }
+    if (GetLD_VECT(curr)){
+        if (GetVECTMUX(curr)){
+            NEXT_LATCHES.VECT_REG = 0x0200 + (NEXT_LATCHES.EXCV << 1);
+        }
+        else{
+            NEXT_LATCHES.VECT_REG = 0x0200 + (NEXT_LATCHES.INTV << 1);
+        }
+    }
 }
