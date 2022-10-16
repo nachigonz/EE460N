@@ -633,8 +633,8 @@ int add16(int num1, int num2){
   return (sext(num1, 16, 32) + sext(num2, 16, 32)) & 0xFFFF;
 }
 
-void setCC(){
-  int val = sext(BUS, 16, 32);
+void setCC(int input){
+  int val = sext(input, 16, 32);
   //printf("CC Check: %04X\n", val);
   NEXT_LATCHES.N = 0;
   NEXT_LATCHES.Z = 0;
@@ -770,7 +770,8 @@ void eval_bus_drivers() {
    *		 Gate_PC,
    *		 Gate_ALU,
    *		 Gate_SHF,
-   *		 Gate_MDR.
+   *		 Gate_MDR,
+             Gate_PSR
    */    
 
     int* curr = CURRENT_LATCHES.MICROINSTRUCTION;
@@ -786,6 +787,9 @@ void eval_bus_drivers() {
         else{
             SR1 = getReg(NEXT_LATCHES.IR, 9);
         }
+        if (GetSRSMUX(curr)){
+            SR1 = 6;
+        }
         OP1 = NEXT_LATCHES.REGS[SR1];
         if (getBit(NEXT_LATCHES.IR, 5)){ // imm5
             OP2 = sext(NEXT_LATCHES.IR & 0x1F, 5, 16);
@@ -793,6 +797,9 @@ void eval_bus_drivers() {
         else{ // SR2
             SR2 = getReg(NEXT_LATCHES.IR, 0);
             OP2 = NEXT_LATCHES.REGS[SR2];
+        }
+        if (GetALUMUX(curr)){
+            OP2 = 2;
         }
         switch (GetALUK(curr)){
             case 0: // Add
@@ -894,6 +901,9 @@ void eval_bus_drivers() {
                 break;
         }
     }
+    if(getGATE_PSR(curr)){
+        BusNext = NEXT_LATCHES.PSR;
+    }
 }
 
 
@@ -941,7 +951,10 @@ void latch_datapath_values() {
         NEXT_LATCHES.BEN |= getBit(NEXT_LATCHES.IR, 9) & NEXT_LATCHES.P;
     }
     if (GetLD_REG(curr)){
-        if(GetDRMUX(curr)){ // R7
+        if (GetDRSMUX(curr)){
+            NEXT_LATCHES.REGS[6] = BUS;
+        }
+        else if(GetDRMUX(curr)){ // R7
             NEXT_LATCHES.REGS[7] = BUS;
         }
         else { // IR 11.9
@@ -949,7 +962,26 @@ void latch_datapath_values() {
         }
     }
     if(GetLD_CC(curr)){
-        setCC();
+        setCC(BUS);
+    }
+    if(GetLD_TEMP(curr)){
+        NEXT_LATCHES.TEMP = BUS;
+    }
+    if(GetLD_PSR(curr)){
+        if (GetMARPSR(curr)){
+            NEXT_LATCHES.PSR = NEXT_LATCHES.TEMP;
+        }
+        else {
+            int tempPSR;
+            tempPSR = NEXT_LATCHES.PSR & 0xFFF8; // Erase NZP bits
+            tempPSR += NEXT_LATCHES.N << 2;
+            tempPSR += NEXT_LATCHES.Z << 1;
+            tempPSR += NEXT_LATCHES.P;
+            NEXT_LATCHES.PSR = tempPSR;
+        }
+        NEXT_LATCHES.N = getBit(NEXT_LATCHES.PSR, 2);
+        NEXT_LATCHES.Z = getBit(NEXT_LATCHES.PSR, 1);
+        NEXT_LATCHES.P = getBit(NEXT_LATCHES.PSR, 0);
     }
     if(GetLD_PC(curr)){
         switch(GetPCMUX(curr)){
