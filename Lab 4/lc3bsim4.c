@@ -50,6 +50,7 @@ void latch_datapath_values();
 /***************************************************************/
 enum CS_BITS {                                                  
     IRD,
+    MEMCHECK,
     COND2, COND1, COND0,
     J5, J4, J3, J2, J1, J0,
     LD_MAR,
@@ -89,6 +90,8 @@ enum CS_BITS {
     LD_VECT,
     GATE_VECT,
     VECTMUX,
+    LD_EXCV,
+    EXCVMUX1, EXCVMUX0,
 /* MODIFY: you have to add all your new control signals */
     CONTROL_STORE_BITS
 } CS_BITS;
@@ -97,6 +100,7 @@ enum CS_BITS {
 /* Functions to get at the control bits.                       */
 /***************************************************************/
 int GetIRD(int *x)           { return(x[IRD]); }
+int GetMEMCHECK(int *x)      { return(x[MEMCHECK]); }
 int GetCOND(int *x)          { return((x[COND2] << 2) + (x[COND1] << 1) + x[COND0]); }
 int GetJ(int *x)             { return((x[J5] << 5) + (x[J4] << 4) +
 				      (x[J3] << 3) + (x[J2] << 2) +
@@ -138,6 +142,8 @@ int GetGATE_OLDPC(int *x)    { return(x[GATE_OLDPC]); }
 int GetLD_VECT(int *x)       { return(x[LD_VECT]); }
 int GetGATE_VECT(int *x)     { return(x[GATE_VECT]); }
 int GetVECTMUX(int *x)       { return(x[VECTMUX]); }
+int GetLD_EXCV(int *x)       { return(x[LD_EXCV]); }
+int GetEXCVMUX(int *x)       { return((x[EXCVMUX1] << 1) + x[EXCVMUX0]); }
 /* MODIFY: you can add more Get functions for your new control signals */
 
 /***************************************************************/
@@ -747,7 +753,7 @@ void eval_micro_sequencer() {
             nextJ = GetJ(currU) | (NEXT_LATCHES.PRIV << 3);
             break;
         case 5: // Interrupt Present Check
-            if(NEXT_LATCHES.INT_PRIO > NEXT_LATCHES.PRIO){
+            if(NEXT_LATCHES.INT_PRIO > NEXT_LATCHES.PRIO ){
                 nextJ = GetJ(currU) | (NEXT_LATCHES.INT << 4);
             }
             break;
@@ -1109,9 +1115,33 @@ void latch_datapath_values() {
     if (GetLD_VECT(curr)){
         if (GetVECTMUX(curr)){
             NEXT_LATCHES.VECT_REG = 0x0200 + (NEXT_LATCHES.EXCV << 1);
+            NEXT_LATCHES.INT_PRIO = 0x07;
         }
         else{
             NEXT_LATCHES.VECT_REG = 0x0200 + (NEXT_LATCHES.INTV << 1);
+        }
+    }
+    if (GetLD_EXCV(curr)){
+        if (GetEXCVMUX(curr) == 2){
+            NEXT_LATCHES.EXCV = 0x04;
+        }
+        else if (GetEXCVMUX(curr)){
+            NEXT_LATCHES.EXCV = 0x03;
+        }
+        else {
+            NEXT_LATCHES.EXCV = 0x02;
+        }
+    }
+
+    if (GetMEMCHECK(curr)){ // Check for any memory access errors
+        if ((NEXT_LATCHES.STATE_NUMBER != 28 && NEXT_LATCHES.MAR >= 0 && NEXT_LATCHES.MAR <= 0x02FFF) || // Access Privilege Violation
+            (NEXT_LATCHES.STATE_NUMBER == 28 && NEXT_LATCHES.MAR > 0x01FF && NEXT_LATCHES.MAR <= 0x02FFF)){ // Checking for the TRAP memory access state
+            memcpy(NEXT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[47], sizeof(int)*CONTROL_STORE_BITS);
+            NEXT_LATCHES.STATE_NUMBER = 47;
+        }
+        else if (GetDATA_SIZE(CURRENT_LATCHES.MICROINSTRUCTION) && getBit(NEXT_LATCHES.MAR, 0)){ // Unaligned Memory Access
+            memcpy(NEXT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[48], sizeof(int)*CONTROL_STORE_BITS);
+            NEXT_LATCHES.STATE_NUMBER = 48;
         }
     }
 }
