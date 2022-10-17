@@ -206,7 +206,7 @@ int SSP; /* Initial value of system stack pointer */
 int TEMP;
 int INT, INT_PRIO;
 int PRIV, PRIO;
-int SAVED_SSP, SAVED_USP;
+int USP;
 int VECT_REG;
 
 } System_Latches;
@@ -755,6 +755,10 @@ void eval_micro_sequencer() {
         case 5: // Interrupt Present Check
             if(NEXT_LATCHES.INT_PRIO > NEXT_LATCHES.PRIO ){
                 nextJ = GetJ(currU) | (NEXT_LATCHES.INT << 4);
+                NEXT_LATCHES.INT = 0;
+            }
+            else {
+                nextJ = GetJ(currU);
             }
             break;
         default:
@@ -952,23 +956,23 @@ void eval_bus_drivers() {
   if (GetGATE_SP(curr)){
     switch (GetSPMUX(curr)){
         case 0:
-            BusNext = NEXT_LATCHES.REGS[6] + 2;
+            BusNext = (NEXT_LATCHES.REGS[6] + 2) & 0xFFFF;
             break;
         case 1:
-            BusNext = NEXT_LATCHES.REGS[6] - 2;
+            BusNext = (NEXT_LATCHES.REGS[6] - 2) & 0xFFFF;
             break;
         case 2:
-            BusNext = NEXT_LATCHES.SAVED_SSP;
+            BusNext = NEXT_LATCHES.SSP;
             break;
         case 3:
-            BusNext = NEXT_LATCHES.SAVED_USP;
+            BusNext = NEXT_LATCHES.USP;
             break;
         default:
             break;
     }
   }
   if (GetGATE_OLDPC(curr)){
-    BusNext = NEXT_LATCHES.PC - 2;
+    BusNext = (NEXT_LATCHES.PC - 2) & 0xFFFF;
   }
   if (GetGATE_VECT(curr)){
     BusNext = NEXT_LATCHES.VECT_REG;
@@ -1000,10 +1004,10 @@ void latch_datapath_values() {
     int* curr = CURRENT_LATCHES.MICROINSTRUCTION;
 
     if (GetLD_USP(curr)){
-        NEXT_LATCHES.SAVED_USP = NEXT_LATCHES.REGS[6];
+        NEXT_LATCHES.USP = NEXT_LATCHES.REGS[6];
     }
     if (GetLD_SSP(curr)){
-        NEXT_LATCHES.SAVED_SSP = NEXT_LATCHES.REGS[6];
+        NEXT_LATCHES.SSP = NEXT_LATCHES.REGS[6];
     }
     if (GetLD_MAR(curr)){
         NEXT_LATCHES.MAR = BUS;
@@ -1106,10 +1110,10 @@ void latch_datapath_values() {
     }
     if (GetLD_PRIO(curr)){
         if (GetPSRMUX(curr)){
-            NEXT_LATCHES.PRIV = 0;
+            NEXT_LATCHES.PRIO = 0;
         }
         else{
-            NEXT_LATCHES.PRIV = getBit(BUS, 15);
+            NEXT_LATCHES.PRIO = getBit(BUS, 15);
         }
     }
     if (GetLD_VECT(curr)){
@@ -1134,8 +1138,8 @@ void latch_datapath_values() {
     }
 
     if (GetMEMCHECK(curr)){ // Check for any memory access errors
-        if ((NEXT_LATCHES.STATE_NUMBER != 28 && NEXT_LATCHES.MAR >= 0 && NEXT_LATCHES.MAR <= 0x02FFF) || // Access Privilege Violation
-            (NEXT_LATCHES.STATE_NUMBER == 28 && NEXT_LATCHES.MAR > 0x01FF && NEXT_LATCHES.MAR <= 0x02FFF)){ // Checking for the TRAP memory access state
+        if ((NEXT_LATCHES.STATE_NUMBER != 28 && NEXT_LATCHES.MAR >= 0 && NEXT_LATCHES.MAR <= 0x02FFF && NEXT_LATCHES.PRIV) || // Access Privilege Violation
+            (NEXT_LATCHES.STATE_NUMBER == 28 && NEXT_LATCHES.MAR > 0x01FF && NEXT_LATCHES.MAR <= 0x02FFF && NEXT_LATCHES.PRIV)){ // Checking for the TRAP memory access state
             memcpy(NEXT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[47], sizeof(int)*CONTROL_STORE_BITS);
             NEXT_LATCHES.STATE_NUMBER = 47;
         }
