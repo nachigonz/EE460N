@@ -76,8 +76,6 @@ enum CS_BITS {
     R_W,
     DATA_SIZE,
     LSHF1,
-    GATE_TEMP,
-    LD_TEMP,
     LD_PRIV,
     LD_PRIO,
     PSRMUX,
@@ -92,6 +90,8 @@ enum CS_BITS {
     VECTMUX,
     LD_EXCV,
     EXCVMUX1, EXCVMUX0,
+    LD_INTEN,
+    INTENMUX,
 /* MODIFY: you have to add all your new control signals */
     CONTROL_STORE_BITS
 } CS_BITS;
@@ -128,8 +128,6 @@ int GetMIO_EN(int *x)        { return(x[MIO_EN]); }
 int GetR_W(int *x)           { return(x[R_W]); }
 int GetDATA_SIZE(int *x)     { return(x[DATA_SIZE]); } 
 int GetLSHF1(int *x)         { return(x[LSHF1]); }
-int GetGATE_TEMP(int *x)     { return(x[GATE_TEMP]); }
-int GetLD_TEMP(int *x)       { return(x[LD_TEMP]); }
 int GetLD_PRIV(int *x)       { return(x[LD_PRIV]); }
 int GetLD_PRIO(int *x)       { return(x[LD_PRIO]); }
 int GetPSRMUX(int *x)        { return(x[PSRMUX]); }
@@ -144,6 +142,8 @@ int GetGATE_VECT(int *x)     { return(x[GATE_VECT]); }
 int GetVECTMUX(int *x)       { return(x[VECTMUX]); }
 int GetLD_EXCV(int *x)       { return(x[LD_EXCV]); }
 int GetEXCVMUX(int *x)       { return((x[EXCVMUX1] << 1) + x[EXCVMUX0]); }
+int GetLD_INTEN(int *x)       { return(x[LD_INTEN]); }
+int GetINTENMUX(int *x)       { return(x[INTENMUX]); }
 /* MODIFY: you can add more Get functions for your new control signals */
 
 /***************************************************************/
@@ -203,7 +203,7 @@ int EXCV; /* Exception vector register */
 int SSP; /* Initial value of system stack pointer */
 /* MODIFY: You may add system latches that are required by your implementation */
 
-int TEMP;
+int INT_EN;
 int INT, INT_PRIO;
 int PRIV, PRIO;
 int USP;
@@ -576,6 +576,7 @@ void initialize(char *argv[], int num_prog_files) {
 
     CURRENT_LATCHES.PRIV = 1; // Initialize to user mode with priority 0
     CURRENT_LATCHES.PRIO = 0;
+    CURRENT_LATCHES.INT_EN = 1;
 
     NEXT_LATCHES = CURRENT_LATCHES;
 
@@ -753,7 +754,7 @@ void eval_micro_sequencer() {
             nextJ = GetJ(currU) | (NEXT_LATCHES.PRIV << 3);
             break;
         case 5: // Interrupt Present Check
-            if(NEXT_LATCHES.INT_PRIO > NEXT_LATCHES.PRIO ){
+            if(NEXT_LATCHES.INT_PRIO > NEXT_LATCHES.PRIO && NEXT_LATCHES.INT_EN){ // ADD INTERRUPT ENALBE BIT
                 nextJ = GetJ(currU) | (NEXT_LATCHES.INT << 4);
                 NEXT_LATCHES.INT = 0;
             }
@@ -942,9 +943,6 @@ void eval_bus_drivers() {
             break;
     }
   }
-  if (GetGATE_TEMP(curr)){
-    BusNext = NEXT_LATCHES.TEMP;
-  }
   if (GetGATE_PSR(curr)){
     int psr = NEXT_LATCHES.P;
     psr += NEXT_LATCHES.Z << 1;
@@ -1097,23 +1095,20 @@ void latch_datapath_values() {
                 break;
         }
     }
-    if (GetLD_TEMP(curr)){
-        NEXT_LATCHES.TEMP = BUS;
-    }
     if (GetLD_PRIV(curr)){
         if (GetPSRMUX(curr)){
-            NEXT_LATCHES.PRIV = 0;
+            NEXT_LATCHES.PRIV = getBit(BUS, 15);
         }
         else{
-            NEXT_LATCHES.PRIV = getBit(BUS, 15);
+            NEXT_LATCHES.PRIV = 0;
         }
     }
     if (GetLD_PRIO(curr)){
         if (GetPSRMUX(curr)){
-            NEXT_LATCHES.PRIO = 0;
+            NEXT_LATCHES.PRIO = NEXT_LATCHES.INT_PRIO;
         }
         else{
-            NEXT_LATCHES.PRIO = getBit(BUS, 15);
+            NEXT_LATCHES.PRIO = 0;
         }
     }
     if (GetLD_VECT(curr)){
@@ -1134,6 +1129,15 @@ void latch_datapath_values() {
         }
         else {
             NEXT_LATCHES.EXCV = 0x02;
+        }
+    }
+
+    if(GetLD_INTEN(curr)){
+        if (GetINTENMUX(curr)){
+            NEXT_LATCHES.INT_EN = 1;
+        } 
+        else{
+            NEXT_LATCHES.INT_EN = 0;
         }
     }
 
