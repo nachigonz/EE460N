@@ -1,8 +1,5 @@
 .ORIG x3000
-LEA R1, int
-LDW R1, R1, x0
 AND R0, R0, x0
-STW R0, R1, x0
 LEA R1, data
 LDW R2, R1, x0
 LDB R1, R2, x0
@@ -46,9 +43,7 @@ ADD R0, R1, R0
 LDB R1, R2, x13
 ADD R0, R1, R0
 STW R0, R2, xA
-AND R2, R2, #0
-STW R0, R2, x0
+JMP R0
 HALT
-int .FILL x4000
 data .FILL xC000
 .END

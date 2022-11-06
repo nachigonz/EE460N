@@ -3,15 +3,648 @@ ADD R6, R6, x-2
 STW R0, R6, x0
 ADD R6, R6, x-2
 STW R1, R6, x0
-LEA R1, mem
+LEA R1, pt
 LDW R1, R1, x0
-AND R0, R0, x0
-ADD R0, R0, x1 
+
+LDW R0, R1, x0
+AND R0, R0, x-2
 STW R0, R1, x0
-LDW R1, R6, x0
-ADD R6, R6, x2
-LDW R0, R6, x0
-ADD R6, R6, x2
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
+AND R1, R1, x2
+LDW R0, R1, x0
+AND R0, R0, x-2
+STW R0, R1, x0
+
 RTI
-mem .FILL x4000
+pt .FILL x1000
 .END
