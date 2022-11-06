@@ -57,6 +57,8 @@ void latch_datapath_values();
 enum CS_BITS {                                                  
     IRD,
     MEMCHECK,
+    VACHECK,
+    RETSTATE,
     COND2, COND1, COND0,
     J5, J4, J3, J2, J1, J0,
     LD_MAR,
@@ -96,6 +98,12 @@ enum CS_BITS {
     VECTMUX,
     LD_EXCV,
     EXCVMUX1, EXCVMUX0,
+    GATE_PTBR,
+    LD_SSTATE,
+    GATE_VA,
+    LD_VA,
+    VAMUX1, VAMUX0,
+    GATE_MAR,
 /* MODIFY: you have to add all your new control signals */
     CONTROL_STORE_BITS
 } CS_BITS;
@@ -105,6 +113,8 @@ enum CS_BITS {
 /***************************************************************/
 int GetIRD(int *x)           { return(x[IRD]); }
 int GetMEMCHECK(int *x)      { return(x[MEMCHECK]); }
+int GetVACHECK(int *x)       { return(x[VACHECK]); }
+int GetRETSTATE(int *x)      { return(x[RETSTATE]); }
 int GetCOND(int *x)          { return((x[COND2] << 2) + (x[COND1] << 1) + x[COND0]); }
 int GetJ(int *x)             { return((x[J5] << 5) + (x[J4] << 4) +
 				      (x[J3] << 3) + (x[J2] << 2) +
@@ -146,6 +156,12 @@ int GetGATE_VECT(int *x)     { return(x[GATE_VECT]); }
 int GetVECTMUX(int *x)       { return(x[VECTMUX]); }
 int GetLD_EXCV(int *x)       { return(x[LD_EXCV]); }
 int GetEXCVMUX(int *x)       { return((x[EXCVMUX1] << 1) + x[EXCVMUX0]); }
+int GetGATE_PTBR(int *x)     { return(x[GATE_PTBR]); }
+int GetLD_SSTATE(int *x)     { return(x[LD_SSTATE]); }
+int GetGATE_VA(int *x)       { return(x[GATE_VA]); }
+int GetLD_VA(int *x)         { return(x[LD_VA]); }
+int GetVAMUX(int *x)         { return((x[VAMUX1] << 1) + x[VAMUX0]); }
+int GetGATE_MAR(int *x)      { return(x[GATE_MAR]); }
 /* MODIFY: you can add more Get functions for your new control signals */
 
 /***************************************************************/
@@ -214,6 +230,8 @@ int INT_PRIO;
 int PRIV, PRIO;
 int USP;
 int VECT_REG;
+
+int SSTATE;
 
 } System_Latches;
 
@@ -763,6 +781,10 @@ void eval_micro_sequencer() {
     // printf("IR: 0x%04X\n", CURRENT_LATCHES.IR);
     memcpy(NEXT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[nextJ], sizeof(int)*CONTROL_STORE_BITS);
   }
+  else if (GetRETSTATE(currU)){
+    nextJ = NEXT_LATCHES.SSTATE;
+    memcpy(NEXT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[nextJ], sizeof(int)*CONTROL_STORE_BITS);
+  }
   else{
     switch (GetCOND(currU)){
         case 0: // 00
@@ -1002,6 +1024,16 @@ void eval_bus_drivers() {
   if (GetGATE_VECT(curr)){
     BusNext = NEXT_LATCHES.VECT_REG;
   }
+
+  if (GetGATE_PTBR(curr)){
+    BusNext = NEXT_LATCHES.PTBR;
+  }
+  if (GetGATE_VA(curr)){
+    BusNext = NEXT_LATCHES.VA;
+  }
+  if (GetGATE_MAR(curr)){
+    BusNext = NEXT_LATCHES.MAR;
+  }
 }
 
 
@@ -1035,7 +1067,17 @@ void latch_datapath_values() {
         NEXT_LATCHES.SSP = NEXT_LATCHES.REGS[6];
     }
     if (GetLD_MAR(curr)){
-        NEXT_LATCHES.MAR = BUS;
+        if (GetVAMUX(curr) == 2){
+            NEXT_LATCHES.MAR = BUS & 0x3E00;
+            NEXT_LATCHES.MAR |= NEXT_LATCHES.VA & 0x01FF;
+        }
+        else if (GetVAMUX(curr) == 1){
+            NEXT_LATCHES.MAR = BUS & 0xFF00;
+            NEXT_LATCHES.MAR |= (NEXT_LATCHES.VA & 0xFE00) >> 8;
+        }
+        else{
+            NEXT_LATCHES.MAR = BUS;
+        }
     }
     if (GetLD_MDR(curr)){
         if (!GetMIO_EN(curr)){
@@ -1147,7 +1189,10 @@ void latch_datapath_values() {
         }
     }
     if (GetLD_EXCV(curr)){
-        if (GetEXCVMUX(curr) == 2){
+        if (GetEXCVMUX(curr) == 3){
+            NEXT_LATCHES.EXCV = 0x05;
+        }
+        else if (GetEXCVMUX(curr) == 2){
             NEXT_LATCHES.EXCV = 0x04;
         }
         else if (GetEXCVMUX(curr)){
@@ -1158,15 +1203,44 @@ void latch_datapath_values() {
         }
     }
 
+    if (GetLD_SSTATE(curr)){
+        NEXT_LATCHES.SSTATE = NEXT_LATCHES.STATE_NUMBER;
+    }
+    if (GetLD_VA(curr)){
+        NEXT_LATCHES.VA = BUS;
+    }
+
     if (GetMEMCHECK(curr)){ // Check for any memory access errors
-        if ((NEXT_LATCHES.STATE_NUMBER != 28 && NEXT_LATCHES.MAR >= 0 && NEXT_LATCHES.MAR <= 0x02FFF && NEXT_LATCHES.PRIV) || // Access Privilege Violation
-            (NEXT_LATCHES.STATE_NUMBER == 28 && NEXT_LATCHES.MAR > 0x01FF && NEXT_LATCHES.MAR <= 0x02FFF && NEXT_LATCHES.PRIV)){ // Checking for the TRAP memory access state
+        // if ((NEXT_LATCHES.STATE_NUMBER != 28 && NEXT_LATCHES.MAR >= 0 && NEXT_LATCHES.MAR <= 0x02FFF && NEXT_LATCHES.PRIV) || // Access Privilege Violation
+        //     (NEXT_LATCHES.STATE_NUMBER == 28 && NEXT_LATCHES.MAR > 0x01FF && NEXT_LATCHES.MAR <= 0x02FFF && NEXT_LATCHES.PRIV)){ // Checking for the TRAP memory access state
+        //     memcpy(NEXT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[47], sizeof(int)*CONTROL_STORE_BITS);
+        //     NEXT_LATCHES.STATE_NUMBER = 47;
+        // }
+        if (GetDATA_SIZE(CURRENT_LATCHES.MICROINSTRUCTION) && getBit(NEXT_LATCHES.MAR, 0)){ // Unaligned Memory Access
+            memcpy(NEXT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[48], sizeof(int)*CONTROL_STORE_BITS);
+            NEXT_LATCHES.STATE_NUMBER = 48;
+        }
+        else{ // GO TO VA TRANSLATION
+            memcpy(NEXT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[42], sizeof(int)*CONTROL_STORE_BITS);
+            NEXT_LATCHES.STATE_NUMBER = 42;
+        }
+    }
+
+    if (GetVACHECK(curr)){ // Check for any virtual address errors
+        if (NEXT_LATCHES.SSTATE != 30 && (getBit(NEXT_LATCHES.MDR, 3) == 0) && NEXT_LATCHES.PRIV){ // Access Privilege Violation
             memcpy(NEXT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[47], sizeof(int)*CONTROL_STORE_BITS);
             NEXT_LATCHES.STATE_NUMBER = 47;
         }
-        else if (GetDATA_SIZE(CURRENT_LATCHES.MICROINSTRUCTION) && getBit(NEXT_LATCHES.MAR, 0)){ // Unaligned Memory Access
-            memcpy(NEXT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[48], sizeof(int)*CONTROL_STORE_BITS);
-            NEXT_LATCHES.STATE_NUMBER = 48;
+        else if (getBit(NEXT_LATCHES.MDR, 2) == 0){ // Page Fault
+            memcpy(NEXT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[26], sizeof(int)*CONTROL_STORE_BITS);
+            NEXT_LATCHES.STATE_NUMBER = 26;
+        }
+
+        // Set PTE Bits
+        NEXT_LATCHES.MDR |= 0x0001; // Set the Reference Bit
+        int ns = NEXT_LATCHES.SSTATE;
+        if (ns == 23 || ns == 24 || ns == 41 || ns == 44){ // If Writing to memory
+            NEXT_LATCHES.MDR |= 0x0002; // Set the Modified Bit
         }
     }
 }
