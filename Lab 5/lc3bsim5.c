@@ -282,6 +282,14 @@ void cycle() {
   drive_bus();
   latch_datapath_values();
 
+  /*
+        SIMULATING AN INTERRUPT TIMER:
+  */
+  if (CYCLE_COUNT == 300){
+    NEXT_LATCHES.INTV = 0x01;
+    NEXT_LATCHES.INT_PRIO = 0x01;
+  }
+
   CURRENT_LATCHES = NEXT_LATCHES;
 
   CYCLE_COUNT++;
@@ -766,6 +774,7 @@ int getOpcode(int IR){
 }
 
 int memoryCount = 0;
+int interruptTaken = 0;
 
 void eval_micro_sequencer() {
 
@@ -775,6 +784,8 @@ void eval_micro_sequencer() {
    */
   int* currU = CURRENT_LATCHES.MICROINSTRUCTION;
   int nextJ;
+
+  if (interruptTaken) interruptTaken = 0;
 
   if (GetIRD(currU)){
     nextJ = getOpcode(NEXT_LATCHES.IR);
@@ -806,6 +817,7 @@ void eval_micro_sequencer() {
             if(NEXT_LATCHES.INT_PRIO > NEXT_LATCHES.PRIO){
                 nextJ = GetJ(currU) | (1 << 4);
                 NEXT_LATCHES.INT_PRIO = 0;
+                interruptTaken = 1;
             }
             else {
                 nextJ = GetJ(currU);
@@ -1210,7 +1222,7 @@ void latch_datapath_values() {
         NEXT_LATCHES.VA = BUS;
     }
 
-    if (GetMEMCHECK(curr)){ // Check for any memory access errors
+    if (GetMEMCHECK(curr) && !interruptTaken){ // Check for any memory access errors
         // if ((NEXT_LATCHES.STATE_NUMBER != 28 && NEXT_LATCHES.MAR >= 0 && NEXT_LATCHES.MAR <= 0x02FFF && NEXT_LATCHES.PRIV) || // Access Privilege Violation
         //     (NEXT_LATCHES.STATE_NUMBER == 28 && NEXT_LATCHES.MAR > 0x01FF && NEXT_LATCHES.MAR <= 0x02FFF && NEXT_LATCHES.PRIV)){ // Checking for the TRAP memory access state
         //     memcpy(NEXT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[47], sizeof(int)*CONTROL_STORE_BITS);
