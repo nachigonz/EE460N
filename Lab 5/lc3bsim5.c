@@ -104,6 +104,8 @@ enum CS_BITS {
     LD_VA,
     VAMUX1, VAMUX0,
     GATE_MAR,
+    LD_SMDR,
+    MDRMUX,
 /* MODIFY: you have to add all your new control signals */
     CONTROL_STORE_BITS
 } CS_BITS;
@@ -162,6 +164,8 @@ int GetGATE_VA(int *x)       { return(x[GATE_VA]); }
 int GetLD_VA(int *x)         { return(x[LD_VA]); }
 int GetVAMUX(int *x)         { return((x[VAMUX1] << 1) + x[VAMUX0]); }
 int GetGATE_MAR(int *x)      { return(x[GATE_MAR]); }
+int GetLD_SMDR(int *x)       { return(x[LD_SMDR]); }
+int GetMDRMUX(int *x)        { return(x[MDRMUX]); }
 /* MODIFY: you can add more Get functions for your new control signals */
 
 /***************************************************************/
@@ -232,6 +236,7 @@ int USP;
 int VECT_REG;
 
 int SSTATE;
+int SMDR;
 
 } System_Latches;
 
@@ -1093,11 +1098,16 @@ void latch_datapath_values() {
     }
     if (GetLD_MDR(curr)){
         if (!GetMIO_EN(curr)){
-            if(GetDATA_SIZE(curr)){ // Word
-                NEXT_LATCHES.MDR = BUS;
+            if (GetMDRMUX(curr)){
+                NEXT_LATCHES.MDR = NEXT_LATCHES.SMDR;
             }
-            else { // Byte
-                NEXT_LATCHES.MDR = BUS & 0x00FF;
+            else{
+                if(GetDATA_SIZE(curr)){ // Word
+                    NEXT_LATCHES.MDR = BUS;
+                }
+                else { // Byte
+                    NEXT_LATCHES.MDR = BUS & 0x00FF;
+                }
             }
         }
     }
@@ -1221,6 +1231,9 @@ void latch_datapath_values() {
     if (GetLD_VA(curr)){
         NEXT_LATCHES.VA = BUS;
     }
+    if (GetLD_SMDR(curr)){
+        NEXT_LATCHES.SMDR = NEXT_LATCHES.MDR;
+    }
 
     if (GetMEMCHECK(curr) && !interruptTaken){ // Check for any memory access errors
         // if ((NEXT_LATCHES.STATE_NUMBER != 28 && NEXT_LATCHES.MAR >= 0 && NEXT_LATCHES.MAR <= 0x02FFF && NEXT_LATCHES.PRIV) || // Access Privilege Violation
@@ -1239,7 +1252,7 @@ void latch_datapath_values() {
     }
 
     if (GetVACHECK(curr)){ // Check for any virtual address errors
-        if (NEXT_LATCHES.SSTATE != 30 && (getBit(NEXT_LATCHES.MDR, 3) == 0) && NEXT_LATCHES.PRIV){ // Access Privilege Violation
+        if ((NEXT_LATCHES.IR & 0xF000)!= 0xF000 && (getBit(NEXT_LATCHES.MDR, 3) == 0) && NEXT_LATCHES.PRIV){ // Access Privilege Violation
             memcpy(NEXT_LATCHES.MICROINSTRUCTION, CONTROL_STORE[47], sizeof(int)*CONTROL_STORE_BITS);
             NEXT_LATCHES.STATE_NUMBER = 47;
         }
