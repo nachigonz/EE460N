@@ -878,6 +878,92 @@ int main(int argc, char *argv[]) {
 
    Begin your code here 	  			       */
 /***************************************************************/
+
+int pows(int num, int a){
+  //printf("Pows: %d, %d\n", num, a);
+  int res = 1;
+  for (int i = 0; i < a; i++){
+    res *= num;
+  }
+  return res;
+}
+
+int getBit(int num, int i){
+  //printf("Num: %08X, %04X\n", num, pows(2, i));
+  return (num & pows(2, i)) >> i;
+}
+
+int sext(int num, int orig, int new){
+  int sBit = getBit(num, orig-1);
+  //printf("sBit: %d\n", sBit);
+  if (sBit){ // true if negative num
+    return (num | ((pows(2, new-orig) -1) << (orig))) & (pows(2, new) - 1);
+  }
+  else
+    return num & (pows(2, new)-1); // Don't need to extend positive nums
+}
+
+int getReg(int num, int i){ // i is the lowest bit of the reg
+  return ((num & pows(2, i+2)) + (num & pows(2, i+1)) + (num & pows(2, i))) >> i;
+}
+
+int add16(int num1, int num2){
+  //printf("Add16: %08X %08X\n", sext(num1, 16, 32), sext(num2, 16, 32));
+  return (sext(num1, 16, 32) + sext(num2, 16, 32)) & 0xFFFF;
+}
+
+void setCC(){
+  int val = sext(BUS, 16, 32);
+  //printf("CC Check: %04X\n", val);
+  NEXT_LATCHES.N = 0;
+  NEXT_LATCHES.Z = 0;
+  NEXT_LATCHES.P = 0;
+  if (val == 0){
+    NEXT_LATCHES.Z = 1;
+  }
+  else if (val < 0){
+    NEXT_LATCHES.N = 1;
+  }
+  else {
+    NEXT_LATCHES.P = 1;
+  }
+}
+
+int getWord(int Address) { // Pass the address in lc3b
+  // printf("Halves: %02X %02X\n", MEMORY[Address][1], MEMORY[Address][0]);
+  return MEMORY[Address >> 1][0] + (MEMORY[Address >> 1][1] << 8);
+  // MEMORY only holds bytes so we don't need to mask
+}
+
+int getByte(int Address) { // Pass the address in lc3b
+  // printf("Byte: %02X\n", MEMORY[Address >> 1][Address % 1]);
+  return MEMORY[Address >> 1][Address % 2];
+  // MEMORY only holds bytes so we don't need to mask
+}
+
+void writeWord(int Address, int word){
+  MEMORY[Address >> 1][0] = word & 0xFF;
+  MEMORY[Address >> 1][1] = (word & 0xFF00) >> 8;
+}
+
+void writeByte(int Address, int word){
+  MEMORY[Address >> 1][Address % 2] = word & 0xFF;
+}
+
+int rshfa(int word, int a){
+  int sBit = getBit(word, 15); // get sign bit
+  //printf("sBit: %d, a: %d\n", sBit, a);
+  if (sBit == 0)
+    return word >> a;  
+  //printf("word >> a: %04X, or: %04X\n", word >> a, (pows(2, a) - 1) << (16 - a));
+  return (word >> a) | ((pows(2, a) - 1) << (16 - a));
+}
+
+int getOpcode(int IR){
+    return ((IR & ((pows(2, 4)-1) << 12)) >> 12);
+}
+
+
 #define COPY_AGEX_CS_START 3 
 #define COPY_MEM_CS_START 9
 #define COPY_SR_CS_START  7
@@ -926,6 +1012,11 @@ void SR_stage() {
   
 }
 
+int memPCMUX; // For PC
+int trapPC, tarPC;
+
+int v_mem_ld_cc, v_mem_ld_reg;
+int mem_reg_id;
 
 /************************* MEM_stage() *************************/
 void MEM_stage() {
@@ -934,10 +1025,109 @@ void MEM_stage() {
   
   /* your code for MEM stage goes here */
 
+  int read, dcache_ready;
+  int mem_w0, mem_w1;
+  if (Get_DCACHE_RW(PS.MEM_CS)){
+    if(Get_DATA_SIZE(PS.MEM_CS)){ // Writing word
+      mem_w0 = 1;
+      mem_w1 = 1;
+    }
+    else{ // Writing byte
+      if (PS.MEM_ADDRESS & 1){ // upper byte
+        mem_w1 = 1;
+      }
+      else{ // lower byte
+        mem_w0 = 1;
+      }
+    }
+  }
+  else{
+    mem_w0 = 0;
+    mem_w1 = 0;
+  }
 
+  dcache_access(PS.MEM_ADDRESS, &read, PS.MEM_ALU_RESULT, dcache_ready, mem_w0, mem_w1);
 
+  if (Get_DATA_SIZE(PS.MEM_CS)){
+    NEW_PS.SR_DATA = read;
+  }
+  else if (PS.MEM_ADDRESS & 1){ // Upper byte
+    NEW_PS.SR_DATA = (read & 0xFF00) >> 8;
+  }
+  else{ // Lower Byte
+    NEW_PS.SR_DATA = read & 0x00FF;
+  }
 
-  
+  if(!PS.MEM_V){ // Bubble Input
+    NEW_PS.SR_V = 0;
+  }
+  else if (Get_DCACHE_EN(PS.MEM_CS) && !dcache_ready){ // D-Cache not ready
+    NEW_PS.SR_V = 0;
+    mem_stall = 1;
+  }
+  else{
+    NEW_PS.SR_V = 1;
+    mem_stall = 0;
+  }
+
+  // Update PC
+  if (Get_BR_OP(PS.MEM_CS)){ // Branch
+    if(PS.MEM_CC & getReg(PS.MEM_IR, 9)){
+      memPCMUX = 1;
+      tarPC = PS.MEM_ADDRESS;
+    }
+    else{
+      memPCMUX = 0;
+    }
+  }
+  else if (Get_UNCOND_OP(PS.MEM_CS)){ // JSR
+    memPCMUX = 1;
+    tarPC = PS.MEM_ADDRESS;
+  }
+  else if (Get_TRAP_OP(PS.MEM_CS)){ // TRAP
+    memPCMUX = 2;
+    trapPC = NEW_PS.SR_DATA;
+  }
+  else{
+    memPCMUX = 0;
+  }
+
+  // More Control Signals
+  if (PS.MEM_V){
+    if(Get_MEM_LD_CC(PS.MEM_CS)){
+      v_mem_ld_cc = 1;
+    }
+    else{
+      v_mem_ld_cc = 0;
+    }
+    
+    if(Get_MEM_LD_REG(PS.MEM_CS)){
+      v_mem_ld_reg = 1;
+    }
+    else{
+      v_mem_ld_reg = 0;
+    }
+
+    if(Get_MEM_BR_STALL(PS.MEM_CS)){
+      v_mem_br_stall = 1;
+    }
+    else{
+      v_mem_br_stall = 0;
+    }
+  }
+  else{
+    v_mem_ld_cc = 0;
+    v_mem_ld_reg = 0;
+    v_mem_br_stall = 0;
+  }
+
+  mem_reg_id = PS.MEM_DRID;
+  NEW_PS.SR_ADDRESS = PS.MEM_ADDRESS;
+  NEW_PS.SR_NPC = PS.MEM_NPC;
+  NEW_PS.SR_ALU_RESULT = PS.MEM_ALU_RESULT;
+  NEW_PS.SR_IR = PS.MEM_IR;
+  NEW_PS.SR_DRID = PS.MEM_DRID;
+
   /* The code below propagates the control signals from MEM.CS latch
      to SR.CS latch. You still need to latch other values into the
      other SR latches. */
