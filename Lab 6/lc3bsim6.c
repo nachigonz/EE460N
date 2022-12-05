@@ -1247,7 +1247,7 @@ void AGEX_stage() {
             ALU_result = OP1 ^ OP2;
             break;
         case 3:
-            ALU_result = OP1;
+            ALU_result = OP2; // PASS B
             break;
     }
   }
@@ -1301,18 +1301,101 @@ void DE_stage() {
   int ii, jj = 0;
   int LD_AGEX; /* You need to write code to compute the value of
 		  LD.AGEX signal */
+  int DE_valid;
+  int sr1, sr2, srn1, srn2;
 
   /* your code for DE stage goes here */
 
-  
+  if(!PS.DE_V){ // Bubble Input
+    DE_valid = 0;
+    LD_AGEX = 1;
+  }
+  else if (mem_stall){
+    DE_valid = 0;
+    LD_AGEX = 0;
+  }
+  else{
+    DE_valid = 1;
+    LD_AGEX = 1;
+  }
 
+  CONTROL_STORE_ADDRESS = ((PS.DE_IR & 0xF800) >> 10) | ((PS.DE_IR & 0x20) >> 5);
+  int* controls = CONTROL_STORE[CONTROL_STORE_ADDRESS];
+
+  if(Get_DE_BR_STALL(controls) && PS.DE_V){
+    v_de_br_stall = 1;
+  }
+  else{
+    v_de_br_stall = 0;
+  }
+
+  // LOAD stuff from SR
+  if (v_sr_ld_reg){
+    REGS[sr_reg_id] = sr_reg_data;
+  }
+  if (v_sr_ld_cc){
+    N = sr_n;
+    Z = sr_z;
+    P = sr_p;
+  }
+
+  sr1 = REGS[getReg(PS.DE_IR, 6)];
+  srn1 = getReg(PS.DE_IR, 6);
+  if (Get_SR2MUX(controls)){
+    sr2 = REGS[getReg(PS.DE_IR, 9)];
+    srn2 = getReg(PS.DE_IR, 9);
+  }
+  else{
+    sr2 = REGS[getReg(PS.DE_IR, 0)];
+    srn2 = getReg(PS.DE_IR, 0);
+  }
+
+  // DEP.STALL Logic
+  dep_stall = 0; // Init to 0
+  if (Get_SR1_NEEDED(controls)){
+    if ((srn1 == agex_reg_id) && v_agex_ld_reg){
+      dep_stall = 1;
+    }
+    if ((srn1 == mem_reg_id) && v_mem_ld_reg){
+      dep_stall = 1;
+    }
+    if ((srn1 == sr_reg_id) && v_sr_ld_reg){
+      dep_stall = 1;
+    }
+  }
+  if (Get_SR2_NEEDED(controls)){
+    if ((srn2 == agex_reg_id) && v_agex_ld_reg){
+      dep_stall = 1;
+    }
+    if ((srn2 == mem_reg_id) && v_mem_ld_reg){
+      dep_stall = 1;
+    }
+    if ((srn2 == sr_reg_id) && v_sr_ld_reg){
+      dep_stall = 1;
+    }
+  }
+  if (Get_DE_BR_OP(controls)){
+    if (v_agex_ld_cc){
+      dep_stall = 1;
+    }
+    if (v_mem_ld_cc){
+      dep_stall = 1;
+    }
+    if (v_sr_ld_cc){
+      dep_stall = 1;
+    }
+  }
 
 
   if (LD_AGEX) {
     /* Your code for latching into AGEX latches goes here */
     
-
-
+    NEW_PS.AGEX_SR1 = sr1;
+    NEW_PS.AGEX_SR2 = sr2;
+    NEW_PS.AGEX_NPC = PS.DE_NPC;
+    NEW_PS.AGEX_IR = PS.DE_IR;
+    NEW_PS.AGEX_CC = (N << 2) | (Z << 1) | P;
+    NEW_PS.AGEX_DRID = Get_DRMUX(controls) ? 7 : getReg(PS.DE_IR, 9);
 
     /* The code below propagates the control signals from the CONTROL
        STORE to the AGEX.CS latch. */
