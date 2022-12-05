@@ -912,22 +912,22 @@ int add16(int num1, int num2){
   return (sext(num1, 16, 32) + sext(num2, 16, 32)) & 0xFFFF;
 }
 
-void setCC(){
-  int val = sext(BUS, 16, 32);
-  //printf("CC Check: %04X\n", val);
-  NEXT_LATCHES.N = 0;
-  NEXT_LATCHES.Z = 0;
-  NEXT_LATCHES.P = 0;
-  if (val == 0){
-    NEXT_LATCHES.Z = 1;
-  }
-  else if (val < 0){
-    NEXT_LATCHES.N = 1;
-  }
-  else {
-    NEXT_LATCHES.P = 1;
-  }
-}
+// void setCC(){
+//   int val = sext(BUS, 16, 32);
+//   //printf("CC Check: %04X\n", val);
+//   NEXT_LATCHES.N = 0;
+//   NEXT_LATCHES.Z = 0;
+//   NEXT_LATCHES.P = 0;
+//   if (val == 0){
+//     NEXT_LATCHES.Z = 1;
+//   }
+//   else if (val < 0){
+//     NEXT_LATCHES.N = 1;
+//   }
+//   else {
+//     NEXT_LATCHES.P = 1;
+//   }
+// }
 
 int getWord(int Address) { // Pass the address in lc3b
   // printf("Halves: %02X %02X\n", MEMORY[Address][1], MEMORY[Address][0]);
@@ -1138,21 +1138,149 @@ void MEM_stage() {
 }
 
 
+int v_agex_ld_cc, v_agex_ld_reg;
+int agex_reg_id;
+
 /************************* AGEX_stage() *************************/
 void AGEX_stage() {
 
   int ii, jj = 0;
   int LD_MEM; /* You need to write code to compute the value of LD.MEM
 		 signal */
+  int newAddress, ALU_result, AGEX_valid;
 
   /* your code for AGEX stage goes here */
 
-  
+  if(!PS.AGEX_V){ // Bubble Input
+    AGEX_valid = 0;
+    LD_MEM = 1;
+  }
+  else if (mem_stall){
+    AGEX_valid = 0;
+    LD_MEM = 0;
+  }
+  else{
+    AGEX_valid = 1;
+    LD_MEM = 1;
+  }
+
+  // More Control Signals
+  if (PS.AGEX_V){
+    if(Get_AGEX_LD_CC(PS.AGEX_CS)){
+      v_agex_ld_cc = 1;
+    }
+    else{
+      v_agex_ld_cc = 0;
+    }
+
+    if(Get_AGEX_LD_REG(PS.AGEX_CS)){
+      v_agex_ld_reg = 1;
+    }
+    else{
+      v_agex_ld_reg = 0;
+    }
+
+    if(Get_AGEX_BR_STALL(PS.AGEX_CS)){
+      v_agex_br_stall = 1;
+    }
+    else{
+      v_agex_br_stall = 0;
+    }
+  }
+  else{
+    v_agex_ld_cc = 0;
+    v_agex_ld_reg = 0;
+    v_agex_br_stall = 0;
+  }
+
+  if (Get_ADDRESSMUX(PS.AGEX_CS)){
+    int address1, address2;
+
+    if (Get_ADDR1MUX(PS.AGEX_CS)){
+      address1 = PS.AGEX_NPC;
+    }
+    else{
+      address1 = PS.AGEX_SR1;
+    }
+
+    if (Get_ADDR2MUX(PS.AGEX_CS) == 3){
+      address2 = sext(PS.AGEX_IR, 11, 16);
+    }
+    else if (Get_ADDR2MUX(PS.AGEX_CS) == 2){
+      address2 = sext(PS.AGEX_IR, 9, 16);
+    }
+    else if (Get_ADDR2MUX(PS.AGEX_CS)){
+      address2 = sext(PS.AGEX_IR, 6, 16);
+    }
+    else{
+      address2 = 0;
+    }
+
+    if (Get_LSHF1(PS.AGEX_CS)){
+      address2 = (address2 << 1) & 0xFFFF;
+    }
+
+    newAddress = add16(address1, address2);
+  }
+  else{
+    newAddress = (PS.AGEX_IR & 0x00FF) << 1;
+  }
+
+  if (Get_ALU_RESULTMUX(PS.AGEX_CS)){
+    int OP1;
+    int OP2;
+    OP1 = PS.AGEX_SR1;
+    if(Get_SR2MUX(PS.AGEX_CS)){
+      OP2 = sext(PS.AGEX_IR & 0x1F, 5, 16);
+    }
+    else{
+      OP2 = PS.AGEX_SR2;
+    }
+    switch (Get_ALUK(PS.AGEX_CS)){
+        case 0: // Add
+            ALU_result = add16(OP1, OP2);
+            break;
+        case 1: // AND
+            ALU_result = OP1 & OP2;
+            break;
+        case 2: // XOR
+            ALU_result = OP1 ^ OP2;
+            break;
+        case 3:
+            ALU_result = OP1;
+            break;
+    }
+  }
+  else{
+    int shiftBits = (PS.AGEX_IR & 0x30) >> 4;
+    int shift = PS.AGEX_IR & 0x0F;
+
+    switch (shiftBits){
+        case 0: // LSHF
+            ALU_result = (PS.AGEX_SR1 << shift) & 0xFFFF;
+            break;
+        case 1: // RSHFL
+            ALU_result = (PS.AGEX_SR1 >> shift) & 0xFFFF;
+            break;
+        case 3: // RSHFA
+            ALU_result = rshfa(PS.AGEX_SR1, shift);
+            break;
+        default:
+            break;
+    }
+  }
 
   if (LD_MEM) {
     /* Your code for latching into MEM latches goes here */
     
-
+    NEW_PS.MEM_ADDRESS = newAddress;
+    NEW_PS.MEM_NPC = PS.AGEX_NPC;
+    NEW_PS.MEM_CC = PS.AGEX_CC;
+    NEW_PS.MEM_ALU_RESULT = ALU_result;
+    NEW_PS.MEM_IR = PS.AGEX_IR;
+    NEW_PS.MEM_DRID = PS.AGEX_DRID;
+    NEW_PS.MEM_V = AGEX_valid;
+    agex_reg_id = PS.AGEX_DRID;
 
     /* The code below propagates the control signals from AGEX.CS latch
        to MEM.CS latch. */
