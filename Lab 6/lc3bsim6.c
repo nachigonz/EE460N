@@ -1386,6 +1386,11 @@ void DE_stage() {
     }
   }
 
+  if (dep_stall){ // Push Bubbles
+    DE_valid = 0;
+    LD_AGEX = 1;
+  }
+
 
   if (LD_AGEX) {
     /* Your code for latching into AGEX latches goes here */
