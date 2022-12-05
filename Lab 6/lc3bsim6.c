@@ -1046,7 +1046,7 @@ void MEM_stage() {
     mem_w1 = 0;
   }
 
-  dcache_access(PS.MEM_ADDRESS, &read, PS.MEM_ALU_RESULT, dcache_ready, mem_w0, mem_w1);
+  dcache_access(PS.MEM_ADDRESS, &read, PS.MEM_ALU_RESULT, &dcache_ready, mem_w0, mem_w1);
 
   if (Get_DATA_SIZE(PS.MEM_CS)){
     NEW_PS.SR_DATA = read;
@@ -1100,7 +1100,7 @@ void MEM_stage() {
     else{
       v_mem_ld_cc = 0;
     }
-    
+
     if(Get_MEM_LD_REG(PS.MEM_CS)){
       v_mem_ld_reg = 1;
     }
