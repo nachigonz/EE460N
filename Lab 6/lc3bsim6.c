@@ -1386,7 +1386,7 @@ void DE_stage() {
     }
   }
 
-  if (dep_stall){ // Push Bubbles
+  if (dep_stall && PS.DE_V){ // Push Bubbles
     DE_valid = 0;
     LD_AGEX = 1;
   }
@@ -1401,6 +1401,7 @@ void DE_stage() {
     NEW_PS.AGEX_IR = PS.DE_IR;
     NEW_PS.AGEX_CC = (N << 2) | (Z << 1) | P;
     NEW_PS.AGEX_DRID = Get_DRMUX(controls) ? 7 : getReg(PS.DE_IR, 9);
+    NEW_PS.AGEX_V = DE_valid;
 
     /* The code below propagates the control signals from the CONTROL
        STORE to the AGEX.CS latch. */
@@ -1415,8 +1416,41 @@ void DE_stage() {
 
 /************************* FETCH_stage() *************************/
 void FETCH_stage() {
-
+  int LD_DE;
+  int fetch_valid;
+  int newPC;
   /* your code for FETCH stage goes here */
 
+  int read; 
+  icache_access(PC, &read, &icache_r);
 
+  if (memPCMUX == 2){
+    PC = trapPC;
+  }
+  else if (memPCMUX){
+    PC = tarPC;
+  }
+  else if (!icache_r && !dep_stall && !mem_stall && !v_de_br_stall && !v_agex_br_stall && !v_mem_br_stall){ // No stalls
+    PC = PC + 2;
+  }
+
+  if (dep_stall || mem_stall || v_de_br_stall || v_agex_br_stall || v_mem_br_stall){// Bubble Input
+    fetch_valid = 0;
+    LD_DE = 0;
+  }
+  else if (!icache_r){
+    fetch_valid = 0;
+    LD_DE = 1;
+  }
+  else{
+    fetch_valid = 1;
+    LD_DE = 1;
+  }
+  
+
+  if(LD_DE){
+    NEW_PS.DE_NPC = PC;
+    NEW_PS.DE_IR = read;
+    NEW_PS.DE_V = LD_DE;
+  }
 }  
