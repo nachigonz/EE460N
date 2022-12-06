@@ -1027,17 +1027,21 @@ void MEM_stage() {
 
   int read, dcache_ready;
   int mem_w0, mem_w1;
+  int write_data;
   if (Get_DCACHE_RW(PS.MEM_CS)){
     if(Get_DATA_SIZE(PS.MEM_CS)){ // Writing word
       mem_w0 = 1;
       mem_w1 = 1;
+      write_data = PS.MEM_ALU_RESULT;
     }
     else{ // Writing byte
       if (PS.MEM_ADDRESS & 1){ // upper byte
         mem_w1 = 1;
+        write_data = PS.MEM_ALU_RESULT << 8;
       }
       else{ // lower byte
         mem_w0 = 1;
+        write_data = PS.MEM_ALU_RESULT;
       }
     }
   }
@@ -1046,7 +1050,7 @@ void MEM_stage() {
     mem_w1 = 0;
   }
 
-  dcache_access(PS.MEM_ADDRESS, &read, PS.MEM_ALU_RESULT, &dcache_ready, mem_w0, mem_w1);
+  dcache_access(PS.MEM_ADDRESS, &read, write_data, &dcache_ready, mem_w0, mem_w1);
 
   if (Get_DATA_SIZE(PS.MEM_CS)){
     NEW_PS.SR_DATA = read;
@@ -1071,22 +1075,27 @@ void MEM_stage() {
   }
 
   // Update PC
-  if (Get_BR_OP(PS.MEM_CS)){ // Branch
-    if(PS.MEM_CC & getReg(PS.MEM_IR, 9)){
+  if (PS.MEM_V){
+    if (Get_BR_OP(PS.MEM_CS)){ // Branch
+      if(PS.MEM_CC & getReg(PS.MEM_IR, 9)){
+        memPCMUX = 1;
+        tarPC = PS.MEM_ADDRESS;
+      }
+      else{
+        memPCMUX = 0;
+      }
+    }
+    else if (Get_UNCOND_OP(PS.MEM_CS)){ // JSR
       memPCMUX = 1;
       tarPC = PS.MEM_ADDRESS;
+    }
+    else if (Get_TRAP_OP(PS.MEM_CS)){ // TRAP
+      memPCMUX = 2;
+      trapPC = NEW_PS.SR_DATA;
     }
     else{
       memPCMUX = 0;
     }
-  }
-  else if (Get_UNCOND_OP(PS.MEM_CS)){ // JSR
-    memPCMUX = 1;
-    tarPC = PS.MEM_ADDRESS;
-  }
-  else if (Get_TRAP_OP(PS.MEM_CS)){ // TRAP
-    memPCMUX = 2;
-    trapPC = NEW_PS.SR_DATA;
   }
   else{
     memPCMUX = 0;
@@ -1197,20 +1206,20 @@ void AGEX_stage() {
     int address1, address2;
 
     if (Get_ADDR1MUX(PS.AGEX_CS)){
-      address1 = PS.AGEX_NPC;
+      address1 = PS.AGEX_SR1;
     }
     else{
-      address1 = PS.AGEX_SR1;
+      address1 = PS.AGEX_NPC;
     }
 
     if (Get_ADDR2MUX(PS.AGEX_CS) == 3){
-      address2 = sext(PS.AGEX_IR, 11, 16);
+      address2 = sext((PS.AGEX_IR & 0x07FF), 11, 16);
     }
     else if (Get_ADDR2MUX(PS.AGEX_CS) == 2){
-      address2 = sext(PS.AGEX_IR, 9, 16);
+      address2 = sext((PS.AGEX_IR & 0x01FF), 9, 16);
     }
     else if (Get_ADDR2MUX(PS.AGEX_CS)){
-      address2 = sext(PS.AGEX_IR, 6, 16);
+      address2 = sext((PS.AGEX_IR & 0x003F), 6, 16);
     }
     else{
       address2 = 0;
@@ -1342,7 +1351,7 @@ void DE_stage() {
 
   sr1 = REGS[getReg(PS.DE_IR, 6)];
   srn1 = getReg(PS.DE_IR, 6);
-  if (Get_SR2MUX(controls)){
+  if ((getOpcode(PS.DE_IR) == 0x3) || (getOpcode(PS.DE_IR) == 0x7)){
     sr2 = REGS[getReg(PS.DE_IR, 9)];
     srn2 = getReg(PS.DE_IR, 9);
   }
@@ -1353,41 +1362,43 @@ void DE_stage() {
 
   // DEP.STALL Logic
   dep_stall = 0; // Init to 0
-  if (Get_SR1_NEEDED(controls)){
-    if ((srn1 == agex_reg_id) && v_agex_ld_reg){
-      dep_stall = 1;
+  if (PS.DE_V){ 
+    if (Get_SR1_NEEDED(controls)){
+      if ((srn1 == agex_reg_id) && v_agex_ld_reg){
+        dep_stall = 1;
+      }
+      if ((srn1 == mem_reg_id) && v_mem_ld_reg){
+        dep_stall = 1;
+      }
+      if ((srn1 == sr_reg_id) && v_sr_ld_reg){
+        dep_stall = 1;
+      }
     }
-    if ((srn1 == mem_reg_id) && v_mem_ld_reg){
-      dep_stall = 1;
+    if (Get_SR2_NEEDED(controls)){
+      if ((srn2 == agex_reg_id) && v_agex_ld_reg){
+        dep_stall = 1;
+      }
+      if ((srn2 == mem_reg_id) && v_mem_ld_reg){
+        dep_stall = 1;
+      }
+      if ((srn2 == sr_reg_id) && v_sr_ld_reg){
+        dep_stall = 1;
+      }
     }
-    if ((srn1 == sr_reg_id) && v_sr_ld_reg){
-      dep_stall = 1;
-    }
-  }
-  if (Get_SR2_NEEDED(controls)){
-    if ((srn2 == agex_reg_id) && v_agex_ld_reg){
-      dep_stall = 1;
-    }
-    if ((srn2 == mem_reg_id) && v_mem_ld_reg){
-      dep_stall = 1;
-    }
-    if ((srn2 == sr_reg_id) && v_sr_ld_reg){
-      dep_stall = 1;
-    }
-  }
-  if (Get_DE_BR_OP(controls)){
-    if (v_agex_ld_cc){
-      dep_stall = 1;
-    }
-    if (v_mem_ld_cc){
-      dep_stall = 1;
-    }
-    if (v_sr_ld_cc){
-      dep_stall = 1;
+    if (Get_DE_BR_OP(controls)){
+      if (v_agex_ld_cc){
+        dep_stall = 1;
+      }
+      if (v_mem_ld_cc){
+        dep_stall = 1;
+      }
+      if (v_sr_ld_cc){
+        dep_stall = 1;
+      }
     }
   }
 
-  if (dep_stall && PS.DE_V){ // Push Bubbles
+  if (dep_stall && PS.DE_V && !mem_stall){ // Push Bubbles
     DE_valid = 0;
     LD_AGEX = 1;
   }
@@ -1422,7 +1433,7 @@ void FETCH_stage() {
   int newPC;
   /* your code for FETCH stage goes here */
 
-  int read; 
+  int read = 0; 
   icache_access(PC, &read, &icache_r);
 
   if (memPCMUX == 2){
@@ -1431,15 +1442,15 @@ void FETCH_stage() {
   else if (memPCMUX){
     PC = tarPC;
   }
-  else if (!icache_r && !dep_stall && !mem_stall && !v_de_br_stall && !v_agex_br_stall && !v_mem_br_stall){ // No stalls
+  else if (icache_r && !dep_stall && !mem_stall && !v_de_br_stall && !v_agex_br_stall && !v_mem_br_stall){ // No stalls
     PC = PC + 2;
   }
 
-  if (dep_stall || mem_stall || v_de_br_stall || v_agex_br_stall || v_mem_br_stall){// Bubble Input
+  if (dep_stall || mem_stall){// Bubble Input
     fetch_valid = 0;
     LD_DE = 0;
   }
-  else if (!icache_r){
+  else if (!icache_r || v_de_br_stall || v_agex_br_stall || v_mem_br_stall){
     fetch_valid = 0;
     LD_DE = 1;
   }
@@ -1452,6 +1463,6 @@ void FETCH_stage() {
   if(LD_DE){
     NEW_PS.DE_NPC = PC;
     NEW_PS.DE_IR = read;
-    NEW_PS.DE_V = LD_DE;
+    NEW_PS.DE_V = fetch_valid;
   }
 }  
