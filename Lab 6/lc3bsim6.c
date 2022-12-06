@@ -1256,7 +1256,8 @@ void AGEX_stage() {
     int shift = PS.AGEX_IR & 0x0F;
 
     switch (shiftBits){
-        case 0: // LSHF
+        case 0:
+        case 2: // LSHF
             ALU_result = (PS.AGEX_SR1 << shift) & 0xFFFF;
             break;
         case 1: // RSHFL
